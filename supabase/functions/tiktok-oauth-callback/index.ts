@@ -63,7 +63,7 @@ Deno.serve(async (request) => {
   if (!tokenResponse.ok || !token.access_token || !token.refresh_token) {
     console.error('TikTok token exchange failed', { status: tokenResponse.status, error: token.error, error_description: token.error_description, log_id: token.log_id })
   }
-  if (!tokenResponse.ok || !token.access_token || !token.refresh_token) return html(`TikTok token exchange failed: ${token.error_description ?? token.error ?? token.message ?? tokenResponse.status}`, 400)
+  if (!tokenResponse.ok || !token.access_token || !token.refresh_token) return html('TikTok отклонил обмен токена.', 400)
 
   const access = await encryptToken(token.access_token)
   const refresh = await encryptToken(token.refresh_token)
