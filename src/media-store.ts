@@ -12,6 +12,8 @@ export type MediaAsset = {
   checksumSha256: string
   signedUrl: string
   createdAt: string
+  validationStatus: 'client_checked' | 'processing' | 'ready' | 'failed'
+  validationError: string | null
 }
 
 type MediaRow = {
@@ -25,6 +27,8 @@ type MediaRow = {
   duration_seconds: number | null
   checksum_sha256: string
   created_at: string
+  validation_status?: 'client_checked' | 'processing' | 'ready' | 'failed'
+  validation_error?: string | null
 }
 
 const bucket = 'content-media'
@@ -96,6 +100,8 @@ async function withSignedUrl(row: MediaRow): Promise<MediaAsset> {
     checksumSha256: row.checksum_sha256,
     signedUrl: signed.data.signedUrl,
     createdAt: row.created_at,
+    validationStatus: row.validation_status ?? 'client_checked',
+    validationError: row.validation_error ?? null,
   }
 }
 
