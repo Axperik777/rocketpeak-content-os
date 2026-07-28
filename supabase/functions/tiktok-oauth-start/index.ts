@@ -6,6 +6,14 @@ async function sha256(value: string) {
   return `\\x${[...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')}`
 }
 
+const base64url = (value: Uint8Array) => btoa(String.fromCharCode(...value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+async function signedState(ownerId: string, redirectUri: string, encodedKey: string) {
+  const payload = base64url(encoder.encode(JSON.stringify({ ownerId, redirectUri, exp: Date.now() + 10 * 60 * 1000, nonce: crypto.randomUUID() })))
+  const rawKey = Uint8Array.from(atob(encodedKey), (character) => character.charCodeAt(0))
+  const key = await crypto.subtle.importKey('raw', rawKey, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  return `${payload}.${base64url(new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode(payload))))}`
+}
+
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
 })
@@ -19,14 +27,15 @@ Deno.serve(async (request) => {
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   const clientKey = Deno.env.get('TIKTOK_CLIENT_KEY')
   const redirectUri = Deno.env.get('TIKTOK_REDIRECT_URI')
-  if (!supabaseUrl || !anonKey || !serviceKey || !clientKey || !redirectUri) return json({ error: 'tiktok_not_configured' }, 503)
+  const tokenKey = Deno.env.get('TOKEN_ENCRYPTION_KEY')
+  if (!supabaseUrl || !anonKey || !serviceKey || !clientKey || !redirectUri || !tokenKey) return json({ error: 'tiktok_not_configured' }, 503)
 
   const authorization = request.headers.get('Authorization') ?? ''
   const authClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } }, auth: { persistSession: false } })
   const { data: userData, error: userError } = await authClient.auth.getUser()
   if (userError || !userData.user) return json({ error: 'unauthorized' }, 401)
 
-  const rawState = crypto.randomUUID() + crypto.randomUUID()
+  const rawState = await signedState(userData.user.id, redirectUri, tokenKey)
   const stateHash = await sha256(rawState)
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
   const stored = await admin.from('tiktok_oauth_states').insert({

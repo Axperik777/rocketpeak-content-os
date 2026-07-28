@@ -21,6 +21,19 @@ async function sha256(value: string) {
   return `\\x${[...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')}`
 }
 
+const fromBase64url = (value: string) => Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4)), (character) => character.charCodeAt(0))
+async function verifiedState(value: string) {
+  const [payload, signature] = value.split('.')
+  const encodedKey = Deno.env.get('TOKEN_ENCRYPTION_KEY')
+  if (!payload || !signature || !encodedKey) return null
+  const rawKey = Uint8Array.from(atob(encodedKey), (character) => character.charCodeAt(0))
+  const key = await crypto.subtle.importKey('raw', rawKey, { name: 'HMAC', hash: 'SHA-256' }, false, ['verify'])
+  if (!await crypto.subtle.verify('HMAC', key, fromBase64url(signature), encoder.encode(payload))) return null
+  const decoded = JSON.parse(new TextDecoder().decode(fromBase64url(payload)))
+  if (!decoded.ownerId || !decoded.redirectUri || Number(decoded.exp) <= Date.now()) return null
+  return decoded as { ownerId: string; redirectUri: string; exp: number }
+}
+
 const html = (message: string, status = 200) => new Response(`<!doctype html><meta charset="utf-8"><title>RocketPeak</title><body style="font:16px system-ui;background:#10130f;color:#f5f4ef;padding:40px"><h1>${message}</h1><p>Эту вкладку можно закрыть.</p></body>`, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': 'https://axperik777.github.io' } })
 
 Deno.serve(async (request) => {
@@ -37,16 +50,14 @@ Deno.serve(async (request) => {
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
   const stateHash = await sha256(state)
-  const stored = await admin.from('tiktok_oauth_states').select('*').eq('state_hash', stateHash).is('used_at', null).maybeSingle()
-  if (stored.error) console.error('TikTok OAuth state lookup failed', stored.error)
-  if (stored.error || !stored.data) return html('Ссылка авторизации истекла или уже использована.', 400)
-
-  if (new Date(stored.data.expires_at).getTime() <= Date.now()) return html('OAuth state expired.', 400)
+  const stateData = await verifiedState(state)
+  if (!stateData) return html('Ссылка авторизации истекла или повреждена.', 400)
+  const stored = { owner_id: stateData.ownerId, redirect_uri: stateData.redirectUri }
 
   const tokenResponse = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_key: clientKey, client_secret: clientSecret, code, grant_type: 'authorization_code', redirect_uri: stored.data.redirect_uri }),
+    body: new URLSearchParams({ client_key: clientKey, client_secret: clientSecret, code, grant_type: 'authorization_code', redirect_uri: stored.redirect_uri }),
   })
   const token = await tokenResponse.json()
   if (!tokenResponse.ok || !token.access_token || !token.refresh_token) {
@@ -58,7 +69,7 @@ Deno.serve(async (request) => {
   const refresh = await encryptToken(token.refresh_token)
   const now = Date.now()
   const saved = await admin.from('tiktok_connections').upsert({
-    owner_id: stored.data.owner_id,
+    owner_id: stored.owner_id,
     status: 'connected',
     open_id: token.open_id,
     access_token_ciphertext: access.ciphertext,
@@ -76,6 +87,6 @@ Deno.serve(async (request) => {
   if (saved.error) return html('Не удалось сохранить подключение TikTok.', 500)
 
   await admin.from('tiktok_oauth_states').update({ used_at: new Date().toISOString() }).eq('state_hash', stateHash).is('used_at', null)
-  await admin.from('publication_controls').update({ publication_enabled: true, enabled_channels: ['TikTok'], disabled_reason: 'Meta remains disabled; TikTok enabled after OAuth', updated_at: new Date().toISOString() }).eq('owner_id', stored.data.owner_id)
+  await admin.from('publication_controls').update({ publication_enabled: true, enabled_channels: ['TikTok'], disabled_reason: 'Meta remains disabled; TikTok enabled after OAuth', updated_at: new Date().toISOString() }).eq('owner_id', stored.owner_id)
   return html('TikTok подключён к RocketPeak Content OS.')
 })

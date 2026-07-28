@@ -23,7 +23,7 @@
       const endpoint = 'https://kqumdrlrkrsgztfwavdr.supabase.co/functions/v1/tiktok-oauth-callback';
       const title = document.querySelector('#title');
       const status = document.querySelector('#status');
-      fetch(endpoint + window.location.search, { headers: { Accept: 'text/html' } })
+      setTimeout(() => fetch(endpoint + window.location.search, { headers: { Accept: 'text/html' } })
         .then(async (response) => {
           if (!response.ok) throw new Error(await response.text());
           window.location.replace('./?tiktok=connected#settings');
@@ -31,7 +31,7 @@
         .catch(() => {
           title.textContent = 'Не удалось подключить TikTok';
           status.textContent = 'Вернитесь в приложение и запустите подключение ещё раз.';
-        });
+        }), 8000);
     </script>
   </body>
 </html>
