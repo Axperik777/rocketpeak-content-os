@@ -35,6 +35,20 @@ export type ContentPlan = {
   posts: Post[]
 }
 
+export const maxPostsPerDay = 3
+
+export function getScheduleError(posts: Post[], candidate: Post) {
+  const activePosts = posts.filter((post) => post.id !== candidate.id && post.status !== 'skipped')
+  const postsOnDate = activePosts.filter((post) => post.scheduledDate === candidate.scheduledDate)
+  if (postsOnDate.some((post) => post.scheduledTime === candidate.scheduledTime)) {
+    return 'На это время уже запланирована публикация. Выберите другое время.'
+  }
+  if (postsOnDate.length >= maxPostsPerDay) {
+    return `На эту дату уже запланировано ${maxPostsPerDay} публикации. Перенесите материал на другой день.`
+  }
+  return ''
+}
+
 const storageKeyV1 = 'rocketpeak-content-os:v1:posts'
 const storageKeyV2 = 'rocketpeak-content-os:v2:plan'
 const validStatuses = new Set<Status>(['draft', 'review', 'approved', 'skipped'])

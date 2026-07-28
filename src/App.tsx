@@ -25,7 +25,7 @@ import {
   UsersRound,
   type LucideIcon,
 } from 'lucide-react'
-import { createDraftPost, createPlan, loadPlan, parsePlan, savePlan, type Channel, type Post, type Status } from './content-store'
+import { createDraftPost, createPlan, getScheduleError, loadPlan, parsePlan, savePlan, type Channel, type Post, type Status } from './content-store'
 
 type View = 'queue' | 'calendar' | 'accounts' | 'settings'
 type Filter = 'all' | 'review' | 'draft' | 'ready' | 'skipped'
@@ -218,6 +218,10 @@ function App() {
     if (!editingPost.format.trim()) errors.format = 'Укажите формат.'
     if (!editingPost.scheduledDate) errors.scheduledDate = 'Выберите дату.'
     if (!editingPost.scheduledTime) errors.scheduledTime = 'Выберите время.'
+    if (editingPost.scheduledDate && editingPost.scheduledTime) {
+      const scheduleError = getScheduleError(posts, editingPost)
+      if (scheduleError) errors.scheduledDate = scheduleError
+    }
     if (editingPost.channels.length === 0) errors.channels = 'Выберите хотя бы один канал.'
     if (editingPost.destinationUrl && !/^https:\/\//i.test(editingPost.destinationUrl)) errors.destinationUrl = 'Ссылка должна начинаться с https://.'
     if (Object.keys(errors).length) {

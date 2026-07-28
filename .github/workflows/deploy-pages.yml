@@ -29,6 +29,8 @@ jobs:
         run: npm ci
       - name: Security audit
         run: npm audit --audit-level=high
+      - name: Test scheduling rules
+        run: npm test
       - name: Build GitHub Pages artifact
         run: npm run build:github
         env:
