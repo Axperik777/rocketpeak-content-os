@@ -490,6 +490,15 @@ function App() {
             { icon: Database, step: '03', title: 'Хранилище медиа', text: 'Приватные изображения и видео с временными HTTPS-ссылками и RLS по владельцу.', state: 'Подключено · Supabase Storage' },
           ].map((item) => { const ConnectionIcon = item.icon; return <div className="connection-card" key={item.step}><div className="connection-icon"><ConnectionIcon /></div><div><span>ШАГ {item.step}</span><h2>{item.title}</h2><p>{item.text}</p></div><em>{item.state}</em><button disabled>Пока недоступно</button></div> })}
           <div className="guardrails panel"><div><span className="eyebrow">ПРАВИЛА СИСТЕМЫ</span><h2>Что разрешено и что заблокировано</h2><p>Эти ограничения остаются включёнными и после подключения API.</p></div><ul><li><CheckCircle2 /><span><b>Разрешено</b> Ручное подтверждение каждой публикации</span></li><li><CheckCircle2 /><span><b>Разрешено</b> Защита от дублей и журнал действий</span></li><li><CheckCircle2 /><span><b>Разрешено</b> Консервативное расписание без всплесков</span></li><li><CircleAlert /><span><b>Заблокировано</b> Автолайки, подписки и массовые комментарии</span></li><li><LockKeyhole /><span><b>Заблокировано</b> Пароли, cookies и браузерные автоклики</span></li></ul></div>
+          <div className="legal-readiness panel">
+            <div><span className="eyebrow">META APP REVIEW</span><h2>Публичные документы готовы</h2><p>Адреса можно указывать в настройках Meta App. Токены в браузере и репозитории не хранятся.</p></div>
+            <ul>
+              <li><CheckCircle2 /><a href="./privacy.html" target="_blank" rel="noreferrer">Политика конфиденциальности</a></li>
+              <li><CheckCircle2 /><a href="./terms.html" target="_blank" rel="noreferrer">Условия использования</a></li>
+              <li><CheckCircle2 /><a href="./data-deletion.html" target="_blank" rel="noreferrer">Инструкция удаления данных</a></li>
+              <li><LockKeyhole /><span>OAuth и публикация останутся выключенными до проверки Meta-активов.</span></li>
+            </ul>
+          </div>
         </section>}
         {editingPost && <div className="editor-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeEditor() }}>
           <form className="post-editor" onSubmit={savePost} role="dialog" aria-modal="true" aria-labelledby="editor-title">
@@ -515,6 +524,7 @@ function App() {
             <div className="editor-actions"><span>{hasUnsavedChanges ? 'Есть несохранённые изменения' : 'Изменений нет'}</span><button type="button" className="button secondary" onClick={closeEditor}>Отмена</button><button className="button primary" type="submit"><Check />Сохранить черновик</button></div>
           </form>
         </div>}
+        <footer className="app-footer"><span>RocketPeak Content OS</span><nav aria-label="Юридические документы"><a href="./privacy.html">Конфиденциальность</a><a href="./terms.html">Условия</a><a href="./data-deletion.html">Удаление данных</a></nav><a href="mailto:developers@rocket-peak.com">developers@rocket-peak.com</a></footer>
       </main>
     </div>
   )

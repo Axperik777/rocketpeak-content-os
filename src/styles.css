@@ -256,6 +256,17 @@ main { min-width: 0; padding: 32px clamp(24px, 3.2vw, 56px) 56px; overflow: hidd
 .guardrails li:nth-last-child(-n+2) > svg { color: var(--ember); }
 .guardrails b { display: inline-block; width: 105px; color: var(--success); font: 9px Consolas, monospace; }
 .guardrails li:nth-last-child(-n+2) b { color: var(--ember); }
+.legal-readiness { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, .8fr); gap: 28px; align-items: start; padding: 24px; }
+.legal-readiness h2 { margin: 5px 0 8px; }
+.legal-readiness p { margin: 0; color: var(--text-3); }
+.legal-readiness ul { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.legal-readiness li { display: flex; align-items: center; gap: 10px; color: var(--text-2); }
+.legal-readiness li svg { flex: 0 0 auto; width: 17px; color: var(--signal); }
+.legal-readiness a { color: var(--text-1); text-decoration-color: var(--signal); text-underline-offset: 4px; }
+.app-footer { max-width: 1560px; margin: 38px auto 0; padding: 22px 0 6px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 18px; color: var(--text-3); font-size: 11px; }
+.app-footer nav { display: flex; gap: 18px; }
+.app-footer a { color: var(--text-2); text-decoration: none; }
+.app-footer a:hover { color: var(--signal); }
 
 @keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -299,6 +310,9 @@ main { min-width: 0; padding: 32px clamp(24px, 3.2vw, 56px) 56px; overflow: hidd
   .connection-icon { width: 46px; height: 46px; }
   .connection-card em, .connection-card button { grid-column: 2; }
   .guardrails { grid-template-columns: 1fr; }
+  .legal-readiness { grid-template-columns: 1fr; }
+  .app-footer { margin-bottom: 72px; align-items: flex-start; flex-direction: column; }
+  .app-footer nav { flex-wrap: wrap; }
 }
 
 @media (max-width: 520px) {
