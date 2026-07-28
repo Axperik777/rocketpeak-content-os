@@ -18,7 +18,7 @@ async function encryptToken(value: string) {
 }
 async function sha256(value: string) {
   const digest = await crypto.subtle.digest('SHA-256', encoder.encode(value))
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+  return `\\x${[...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')}`
 }
 
 const html = (message: string, status = 200) => new Response(`<!doctype html><meta charset="utf-8"><title>RocketPeak</title><body style="font:16px system-ui;background:#10130f;color:#f5f4ef;padding:40px"><h1>${message}</h1><p>Эту вкладку можно закрыть.</p></body>`, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': 'https://axperik777.github.io' } })
