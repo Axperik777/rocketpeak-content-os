@@ -17,6 +17,8 @@ type PostRow = {
   status: Status
   facebook_caption: string
   instagram_caption: string
+  tiktok_caption: string
+  tiktok_privacy: Post['tiktokPrivacy']
   cta: string
   destination_url: string
   approved_version: number | null
@@ -56,6 +58,8 @@ function fromRow(row: PostRow): Post {
     status: row.status,
     facebookCaption: row.facebook_caption,
     instagramCaption: row.instagram_caption,
+    tiktokCaption: row.tiktok_caption ?? row.instagram_caption,
+    tiktokPrivacy: row.tiktok_privacy ?? 'SELF_ONLY',
     cta: row.cta,
     destinationUrl: row.destination_url,
     approval: row.approved_version && row.approved_at ? { version: row.approved_version, approvedAt: row.approved_at } : null,
@@ -80,6 +84,8 @@ function toRow(post: Post, ownerId: string) {
     status: post.status,
     facebook_caption: post.facebookCaption,
     instagram_caption: post.instagramCaption,
+    tiktok_caption: post.tiktokCaption,
+    tiktok_privacy: post.tiktokPrivacy,
     cta: post.cta,
     destination_url: post.destinationUrl,
     approved_version: post.approval?.version ?? null,

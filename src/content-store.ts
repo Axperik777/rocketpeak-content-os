@@ -1,5 +1,6 @@
-export type Channel = 'Facebook' | 'Instagram'
+export type Channel = 'Facebook' | 'Instagram' | 'TikTok'
 export type Status = 'draft' | 'review' | 'approved' | 'skipped'
+export type TikTokPrivacy = 'SELF_ONLY' | 'MUTUAL_FOLLOW_FRIENDS' | 'PUBLIC_TO_EVERYONE'
 
 export type Approval = {
   version: number
@@ -21,6 +22,8 @@ export type Post = {
   status: Status
   facebookCaption: string
   instagramCaption: string
+  tiktokCaption: string
+  tiktokPrivacy: TikTokPrivacy
   cta: string
   destinationUrl: string
   approval: Approval | null
@@ -52,7 +55,7 @@ export function getScheduleError(posts: Post[], candidate: Post) {
 const storageKeyV1 = 'rocketpeak-content-os:v1:posts'
 const storageKeyV2 = 'rocketpeak-content-os:v2:plan'
 const validStatuses = new Set<Status>(['draft', 'review', 'approved', 'skipped'])
-const validChannels = new Set<Channel>(['Facebook', 'Instagram'])
+const validChannels = new Set<Channel>(['Facebook', 'Instagram', 'TikTok'])
 const accountIds = new Set(['page-rocketpeak', 'page-arsen', 'page-ad-lumeo'])
 
 const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/
@@ -124,6 +127,9 @@ function parsePost(value: unknown): Post | null {
     status,
     facebookCaption: normalizeText(value.facebookCaption),
     instagramCaption: normalizeText(value.instagramCaption),
+    tiktokCaption: normalizeText(value.tiktokCaption, normalizeText(value.instagramCaption)),
+    tiktokPrivacy: ['SELF_ONLY', 'MUTUAL_FOLLOW_FRIENDS', 'PUBLIC_TO_EVERYONE'].includes(normalizeText(value.tiktokPrivacy))
+      ? normalizeText(value.tiktokPrivacy) as TikTokPrivacy : 'SELF_ONLY',
     cta: normalizeText(value.cta),
     destinationUrl: normalizeText(value.destinationUrl),
     approval: status === 'approved' && approval?.version === version ? approval : null,
@@ -155,6 +161,8 @@ function migrateLegacyPost(value: unknown): Post | null {
     status,
     facebookCaption: hook,
     instagramCaption: hook,
+    tiktokCaption: hook,
+    tiktokPrivacy: 'SELF_ONLY',
     cta: '',
     destinationUrl: '',
     approval: status === 'approved' ? { version, approvedAt: createdAt } : null,
@@ -180,6 +188,8 @@ export function createDraftPost(): Post {
     status: 'draft',
     facebookCaption: '',
     instagramCaption: '',
+    tiktokCaption: '',
+    tiktokPrivacy: 'SELF_ONLY',
     cta: '',
     destinationUrl: '',
     approval: null,
@@ -201,7 +211,7 @@ export function createSeedPosts(): Post[] {
   const createdAt = nowIso()
   return rows.map(([scheduledDate, scheduledTime, pillar, title, hook, accountId, channels, status, format]) => ({
     id: createId(), version: 1, scheduledDate, scheduledTime, timezone: 'Asia/Tbilisi', pillar, title, hook, format, accountId,
-    channels: [...channels] as Channel[], status, facebookCaption: hook, instagramCaption: hook, cta: '', destinationUrl: '',
+    channels: [...channels] as Channel[], status, facebookCaption: hook, instagramCaption: hook, tiktokCaption: hook, tiktokPrivacy: 'SELF_ONLY', cta: '', destinationUrl: '',
     approval: status === 'approved' ? { version: 1, approvedAt: createdAt } : null, createdAt, updatedAt: createdAt,
   }))
 }

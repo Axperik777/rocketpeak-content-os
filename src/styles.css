@@ -81,7 +81,7 @@ main { min-width: 0; padding: 32px clamp(24px, 3.2vw, 56px) 56px; overflow: hidd
 .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--signal); box-shadow: 0 0 0 3px rgba(193, 230, 65, .12); }
 .field [aria-invalid="true"] { border-color: var(--danger); }
 .field-error { color: var(--danger); font-size: 11px; line-height: 1.35; }
-.channel-field { margin: 0; padding: 0; border: 0; align-content: end; grid-template-columns: 1fr 1fr; }
+.channel-field { margin: 0; padding: 0; border: 0; align-content: end; grid-template-columns: repeat(3, 1fr); }
 .channel-field legend { margin-bottom: 7px; }
 .channel-field label { min-height: 44px; padding: 0 10px; display: flex; align-items: center; gap: 8px; background: var(--surface-soft); border: 1px solid var(--line-bright); border-radius: 9px; font-size: 11px; }
 .channel-field input { width: 16px; min-height: 16px; accent-color: var(--signal); }

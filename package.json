@@ -22,6 +22,7 @@
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react": "^5.0.2",
     "rollup": "npm:@rollup/wasm-node@^4.62.3",
+    "supabase": "^2.110.0",
     "typescript": "^5.9.2",
     "vite": "^7.1.3",
     "vitest": "^4.1.10"

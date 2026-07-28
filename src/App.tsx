@@ -14,6 +14,7 @@ import {
   MessageCircle,
   FileText,
   Camera,
+  Music2,
   LayoutList,
   LockKeyhole,
   Pencil,
@@ -75,7 +76,8 @@ function Mark() {
 }
 
 function ChannelIcon({ channel }: { channel: Channel }) {
-  return <span className="channel" title={channel}>{channel === 'Facebook' ? <MessageCircle /> : <Camera />}<span>{channel}</span></span>
+  const icon = channel === 'Facebook' ? <MessageCircle /> : channel === 'Instagram' ? <Camera /> : <Music2 />
+  return <span className="channel" title={channel}>{icon}<span>{channel}</span></span>
 }
 
 function accountName(accountId: string) {
@@ -115,6 +117,7 @@ function App() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([])
   const [mediaBusy, setMediaBusy] = useState(false)
+  const [tiktokStatus, setTiktokStatus] = useState('disconnected')
   const noticeTimer = useRef<number | undefined>(undefined)
   const editingOriginal = useRef<Post | null>(null)
   const isNewDraft = useRef(false)
@@ -185,6 +188,14 @@ function App() {
     return () => { cancelled = true }
   }, [remoteReady, session])
 
+  useEffect(() => {
+    if (!session || !remoteReady || !supabase) return
+    supabase.rpc('get_tiktok_connection_status').then(({ data }) => {
+      const status = Array.isArray(data) ? data[0]?.status : undefined
+      if (status) setTiktokStatus(status)
+    })
+  }, [remoteReady, session?.user.id])
+
   const hasUnsavedChanges = useMemo(() => editingPost !== null && JSON.stringify(editingPost) !== JSON.stringify(editingOriginal.current), [editingPost])
 
   useEffect(() => {
@@ -243,6 +254,17 @@ function App() {
   const openView = (nextView: View) => {
     setView(nextView)
     window.history.replaceState(null, '', `#${nextView}`)
+  }
+
+  const connectTikTok = async () => {
+    if (!supabase || !session) return
+    showNotice('Открываю официальную авторизацию TikTok…')
+    const { data, error } = await supabase.functions.invoke('tiktok-oauth-start', { body: {} })
+    if (error || !data?.authorizationUrl) {
+      showNotice(data?.error === 'tiktok_not_configured' ? 'Сначала добавьте Client Key и Client Secret TikTok.' : 'Не удалось открыть авторизацию TikTok.')
+      return
+    }
+    window.location.assign(data.authorizationUrl)
   }
 
   const changeStatus = (id: string, status: Status) => {
@@ -315,6 +337,7 @@ function App() {
       format: editingPost.format.trim(),
       facebookCaption: editingPost.facebookCaption.trim(),
       instagramCaption: editingPost.instagramCaption.trim(),
+      tiktokCaption: editingPost.tiktokCaption.trim(),
       cta: editingPost.cta.trim(),
       destinationUrl: editingPost.destinationUrl.trim(),
       version: creating ? editingPost.version : (original?.version ?? editingPost.version) + 1,
@@ -488,7 +511,8 @@ function App() {
             { icon: PlugZap, step: '01', title: 'Meta Graph API', text: 'Официальное подключение Facebook Pages и профессионального Instagram.', state: 'Ждёт проверки активов' },
             { icon: Bot, step: '02', title: 'Telegram-согласование', text: 'Получать превью и принимать решение без входа в интерфейс.', state: 'Ждёт токен бота' },
             { icon: Database, step: '03', title: 'Хранилище медиа', text: 'Приватные изображения и видео с временными HTTPS-ссылками и RLS по владельцу.', state: 'Подключено · Supabase Storage' },
-          ].map((item) => { const ConnectionIcon = item.icon; return <div className="connection-card" key={item.step}><div className="connection-icon"><ConnectionIcon /></div><div><span>ШАГ {item.step}</span><h2>{item.title}</h2><p>{item.text}</p></div><em>{item.state}</em><button disabled>Пока недоступно</button></div> })}
+            { icon: Music2, step: '04', title: 'TikTok Content Posting API', text: 'Официальная OAuth-авторизация и публикация MP4-видео из той же очереди.', state: tiktokStatus === 'connected' ? 'Подключено' : 'Готово к авторизации', action: connectTikTok },
+          ].map((item) => { const ConnectionIcon = item.icon; return <div className="connection-card" key={item.step}><div className="connection-icon"><ConnectionIcon /></div><div><span>ШАГ {item.step}</span><h2>{item.title}</h2><p>{item.text}</p></div><em>{item.state}</em><button disabled={!item.action || tiktokStatus === 'connected'} onClick={item.action}>{item.action ? (tiktokStatus === 'connected' ? 'Подключено' : 'Подключить TikTok') : 'Пока недоступно'}</button></div> })}
           <div className="guardrails panel"><div><span className="eyebrow">ПРАВИЛА СИСТЕМЫ</span><h2>Что разрешено и что заблокировано</h2><p>Эти ограничения остаются включёнными и после подключения API.</p></div><ul><li><CheckCircle2 /><span><b>Разрешено</b> Ручное подтверждение каждой публикации</span></li><li><CheckCircle2 /><span><b>Разрешено</b> Защита от дублей и журнал действий</span></li><li><CheckCircle2 /><span><b>Разрешено</b> Консервативное расписание без всплесков</span></li><li><CircleAlert /><span><b>Заблокировано</b> Автолайки, подписки и массовые комментарии</span></li><li><LockKeyhole /><span><b>Заблокировано</b> Пароли, cookies и браузерные автоклики</span></li></ul></div>
           <div className="legal-readiness panel">
             <div><span className="eyebrow">META APP REVIEW</span><h2>Публичные документы готовы</h2><p>Адреса можно указывать в настройках Meta App. Токены в браузере и репозитории не хранятся.</p></div>
@@ -510,9 +534,11 @@ function App() {
             <label className="field"><span>Дата</span><input name="scheduledDate" type="date" autoComplete="off" aria-invalid={Boolean(formErrors.scheduledDate)} value={editingPost.scheduledDate} onInput={(event) => updateEditingPost({ scheduledDate: event.currentTarget.value })} />{formErrors.scheduledDate && <small className="field-error">{formErrors.scheduledDate}</small>}</label>
             <label className="field"><span>Время · Тбилиси</span><input name="scheduledTime" type="time" autoComplete="off" aria-invalid={Boolean(formErrors.scheduledTime)} value={editingPost.scheduledTime} onInput={(event) => updateEditingPost({ scheduledTime: event.currentTarget.value })} />{formErrors.scheduledTime && <small className="field-error">{formErrors.scheduledTime}</small>}</label>
             <label className="field"><span>Аккаунт</span><select name="accountId" autoComplete="off" value={editingPost.accountId} onChange={(event) => updateEditingPost({ accountId: event.target.value })}>{accounts.filter((account) => account.state === 'active').map((account) => <option value={account.id} key={account.id}>{account.name}</option>)}</select></label>
-            <fieldset className="field channel-field" aria-invalid={Boolean(formErrors.channels)}><legend>Каналы</legend>{(['Facebook', 'Instagram'] as Channel[]).map((channel) => <label key={channel}><input name="channels" type="checkbox" checked={editingPost.channels.includes(channel)} onChange={(event) => updateEditingChannel(channel, event.target.checked)} />{channel}</label>)}{formErrors.channels && <small className="field-error">{formErrors.channels}</small>}</fieldset>
+            <fieldset className="field channel-field" aria-invalid={Boolean(formErrors.channels)}><legend>Каналы</legend>{(['Facebook', 'Instagram', 'TikTok'] as Channel[]).map((channel) => <label key={channel}><input name="channels" type="checkbox" checked={editingPost.channels.includes(channel)} onChange={(event) => updateEditingChannel(channel, event.target.checked)} />{channel}</label>)}{formErrors.channels && <small className="field-error">{formErrors.channels}</small>}</fieldset>
             <label className="field field--wide"><span>Текст Facebook</span><textarea name="facebookCaption" autoComplete="off" rows={4} value={editingPost.facebookCaption} onChange={(event) => updateEditingPost({ facebookCaption: event.target.value })} placeholder="Полный текст для Facebook…" /></label>
             <label className="field field--wide"><span>Текст Instagram</span><textarea name="instagramCaption" autoComplete="off" rows={4} value={editingPost.instagramCaption} onChange={(event) => updateEditingPost({ instagramCaption: event.target.value })} placeholder="Полный текст для Instagram…" /></label>
+            <label className="field field--wide"><span>Текст TikTok</span><textarea name="tiktokCaption" autoComplete="off" rows={3} value={editingPost.tiktokCaption} onChange={(event) => updateEditingPost({ tiktokCaption: event.target.value })} placeholder="Подпись и хэштеги для TikTok…" /></label>
+            {editingPost.channels.includes('TikTok') && <label className="field"><span>Видимость TikTok</span><select name="tiktokPrivacy" value={editingPost.tiktokPrivacy} onChange={(event) => updateEditingPost({ tiktokPrivacy: event.target.value as Post['tiktokPrivacy'] })}><option value="SELF_ONLY">Только я · тест</option><option value="MUTUAL_FOLLOW_FRIENDS">Друзья</option><option value="PUBLIC_TO_EVERYONE">Публично</option></select></label>}
             <label className="field"><span>CTA</span><input name="cta" autoComplete="off" value={editingPost.cta} onChange={(event) => updateEditingPost({ cta: event.target.value })} placeholder="Получить аудит…" /></label>
             <label className="field"><span>HTTPS-ссылка</span><input name="destinationUrl" type="url" inputMode="url" autoComplete="off" aria-invalid={Boolean(formErrors.destinationUrl)} value={editingPost.destinationUrl} onChange={(event) => updateEditingPost({ destinationUrl: event.target.value })} placeholder="https://rocket-peak.com/…" />{formErrors.destinationUrl && <small className="field-error">{formErrors.destinationUrl}</small>}</label>
             <section className="media-field field--wide" aria-label="Медиа публикации">
