@@ -11,7 +11,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 })
 
 Deno.serve(async (request) => {
-  if (request.method === 'OPTIONS') return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' } })
+  if (request.method === 'OPTIONS') return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' } })
   if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -35,7 +35,10 @@ Deno.serve(async (request) => {
     redirect_uri: redirectUri,
     expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
   })
-  if (stored.error) return json({ error: 'state_store_failed' }, 500)
+  if (stored.error) {
+    console.error('TikTok OAuth state insert failed', stored.error)
+    return json({ error: 'state_store_failed' }, 500)
+  }
 
   const query = new URLSearchParams({
     client_key: clientKey,

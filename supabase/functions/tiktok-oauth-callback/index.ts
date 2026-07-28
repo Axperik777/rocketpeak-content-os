@@ -37,16 +37,21 @@ Deno.serve(async (request) => {
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
   const stateHash = await sha256(state)
-  const stored = await admin.from('tiktok_oauth_states').select('*').eq('state_hash', stateHash).is('used_at', null).gt('expires_at', new Date().toISOString()).maybeSingle()
+  const stored = await admin.from('tiktok_oauth_states').select('*').eq('state_hash', stateHash).is('used_at', null).maybeSingle()
+  if (stored.error) console.error('TikTok OAuth state lookup failed', stored.error)
   if (stored.error || !stored.data) return html('Ссылка авторизации истекла или уже использована.', 400)
 
-  await admin.from('tiktok_oauth_states').update({ used_at: new Date().toISOString() }).eq('state_hash', stateHash).is('used_at', null)
+  if (new Date(stored.data.expires_at).getTime() <= Date.now()) return html('OAuth state expired.', 400)
+
   const tokenResponse = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ client_key: clientKey, client_secret: clientSecret, code, grant_type: 'authorization_code', redirect_uri: stored.data.redirect_uri }),
   })
   const token = await tokenResponse.json()
+  if (!tokenResponse.ok || !token.access_token || !token.refresh_token) {
+    console.error('TikTok token exchange failed', { status: tokenResponse.status, error: token.error, error_description: token.error_description, log_id: token.log_id })
+  }
   if (!tokenResponse.ok || !token.access_token || !token.refresh_token) return html('TikTok отклонил обмен токена.', 400)
 
   const access = await encryptToken(token.access_token)
@@ -70,6 +75,7 @@ Deno.serve(async (request) => {
   })
   if (saved.error) return html('Не удалось сохранить подключение TikTok.', 500)
 
+  await admin.from('tiktok_oauth_states').update({ used_at: new Date().toISOString() }).eq('state_hash', stateHash).is('used_at', null)
   await admin.from('publication_controls').update({ publication_enabled: true, enabled_channels: ['TikTok'], disabled_reason: 'Meta remains disabled; TikTok enabled after OAuth', updated_at: new Date().toISOString() }).eq('owner_id', stored.data.owner_id)
   return html('TikTok подключён к RocketPeak Content OS.')
 })

@@ -43,6 +43,7 @@ create table if not exists public.tiktok_connections (
 
 alter table public.tiktok_connections enable row level security;
 revoke all on public.tiktok_connections from public, anon, authenticated;
+grant select, insert, update on public.tiktok_connections to service_role;
 
 create table if not exists public.tiktok_oauth_states (
   state_hash text primary key,
@@ -55,6 +56,7 @@ create table if not exists public.tiktok_oauth_states (
 
 alter table public.tiktok_oauth_states enable row level security;
 revoke all on public.tiktok_oauth_states from public, anon, authenticated;
+grant select, insert, update on public.tiktok_oauth_states to service_role;
 
 create or replace function public.get_tiktok_connection_status()
 returns table (
