@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { Session } from '@supabase/supabase-js'
 import {
   Bot,
   CalendarDays,
@@ -26,6 +27,9 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { createDraftPost, createPlan, getScheduleError, loadPlan, parsePlan, savePlan, type Channel, type Post, type Status } from './content-store'
+import { AuthScreen } from './AuthScreen'
+import { loadRemotePosts, prepareUser, saveRemotePosts } from './remote-store'
+import { supabase } from './supabase'
 
 type View = 'queue' | 'calendar' | 'accounts' | 'settings'
 type Filter = 'all' | 'review' | 'draft' | 'ready' | 'skipped'
@@ -96,6 +100,10 @@ function safeHostname(value: string) {
 }
 
 function App() {
+  const [session, setSession] = useState<Session | null>(null)
+  const [authReady, setAuthReady] = useState(false)
+  const [remoteReady, setRemoteReady] = useState(false)
+  const [syncState, setSyncState] = useState<'local' | 'syncing' | 'synced' | 'error'>('local')
   const [view, setView] = useState<View>(getInitialView)
   const [filter, setFilter] = useState<Filter>('all')
   const [posts, setPosts] = useState<Post[]>(initialPlan.posts)
@@ -112,6 +120,54 @@ function App() {
   useEffect(() => {
     savePlan(posts)
   }, [posts])
+
+  useEffect(() => {
+    if (!supabase) {
+      setAuthReady(true)
+      return
+    }
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      setAuthReady(true)
+    })
+    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession)
+      setAuthReady(true)
+      if (!nextSession) setRemoteReady(false)
+    })
+    return () => data.subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (!session) return
+    let cancelled = false
+    setSyncState('syncing')
+    Promise.all([prepareUser(session.user), loadRemotePosts(session.user.id)])
+      .then(async ([, remotePosts]) => {
+        if (cancelled) return
+        if (remotePosts.length) setPosts(remotePosts)
+        else await saveRemotePosts(session.user.id, initialPlan.posts)
+        if (!cancelled) {
+          setRemoteReady(true)
+          setSyncState('synced')
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setSyncState('error')
+      })
+    return () => { cancelled = true }
+  }, [session?.user.id])
+
+  useEffect(() => {
+    if (!session || !remoteReady) return
+    setSyncState('syncing')
+    const timer = window.setTimeout(() => {
+      saveRemotePosts(session.user.id, posts)
+        .then(() => setSyncState('synced'))
+        .catch(() => setSyncState('error'))
+    }, 500)
+    return () => window.clearTimeout(timer)
+  }, [posts, remoteReady, session?.user.id])
 
   const hasUnsavedChanges = useMemo(() => editingPost !== null && JSON.stringify(editingPost) !== JSON.stringify(editingOriginal.current), [editingPost])
 
@@ -294,6 +350,9 @@ function App() {
   const activeMeta = viewMeta[view]
   const todayLabel = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', timeZone: 'Asia/Tbilisi' }).format(new Date())
 
+  if (!authReady) return <main className="auth-screen"><div className="auth-loading">Проверяем защищённую сессию…</div></main>
+  if (!session) return <AuthScreen />
+
   return (
     <div className="app-shell">
       <a className="skip-link" href="#workspace">Перейти к содержимому</a>
@@ -306,13 +365,13 @@ function App() {
           })}
         </nav>
         <div className="safety-card"><ShieldCheck /><div><strong>Безопасный режим</strong><span>Публикация только после подтверждения</span></div></div>
-        <div className="sidebar-foot"><span className="live-dot" />Локальная версия · API отключены</div>
+        <div className={`sidebar-foot sync-${syncState}`}><span className="live-dot" />{syncState === 'synced' ? 'Синхронизировано' : syncState === 'syncing' ? 'Синхронизация…' : syncState === 'error' ? 'Ошибка синхронизации' : 'Локальный режим'}</div>
       </aside>
 
       <main id="workspace">
         <header className="topbar">
           <div className="page-title"><span className="eyebrow">ROCKETPEAK · {todayLabel.toUpperCase()} · ТБИЛИСИ</span><h1>{activeMeta.title}</h1><p>{activeMeta.description}</p></div>
-          <div className="top-actions"><input ref={importInput} className="visually-hidden" type="file" accept="application/json,.json" onChange={importPlan} /><button className="button secondary" onClick={() => importInput.current?.click()}><Upload />Импорт</button><button className="button secondary" onClick={exportPlan}><Download />Экспорт</button><button className="button primary" onClick={createDraft}><Plus />Новый материал</button></div>
+          <div className="top-actions"><input ref={importInput} className="visually-hidden" type="file" accept="application/json,.json" onChange={importPlan} /><button className="button secondary" onClick={() => importInput.current?.click()}><Upload />Импорт</button><button className="button secondary" onClick={exportPlan}><Download />Экспорт</button><button className="button secondary" onClick={() => supabase?.auth.signOut()}>Выйти</button><button className="button primary" onClick={createDraft}><Plus />Новый материал</button></div>
         </header>
 
         {notice && <div className="toast" role="status"><CheckCircle2 />{notice}</div>}
