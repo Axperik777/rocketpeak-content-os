@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Подключение TikTok — RocketPeak Content OS</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0d100d; color: #f4f4ef; }
+      main { width: min(520px, calc(100% - 48px)); padding: 36px; border: 1px solid #30362c; border-radius: 24px; background: #151914; }
+      strong { color: #c8ff2e; letter-spacing: .08em; text-transform: uppercase; }
+      h1 { margin: 18px 0 12px; font-size: clamp(28px, 6vw, 44px); line-height: 1.05; }
+      p { margin: 0; color: #b7bcae; line-height: 1.6; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <strong>RocketPeak Content OS</strong>
+      <h1 id="title">Подключаем TikTok</h1>
+      <p id="status">Проверяем разрешение и сохраняем подключение…</p>
+    </main>
+    <script>
+      const endpoint = 'https://kqumdrlrkrsgztfwavdr.supabase.co/functions/v1/tiktok-oauth-callback';
+      const title = document.querySelector('#title');
+      const status = document.querySelector('#status');
+      fetch(endpoint + window.location.search, { headers: { Accept: 'text/html' } })
+        .then(async (response) => {
+          if (!response.ok) throw new Error(await response.text());
+          window.location.replace('./?tiktok=connected#settings');
+        })
+        .catch(() => {
+          title.textContent = 'Не удалось подключить TikTok';
+          status.textContent = 'Вернитесь в приложение и запустите подключение ещё раз.';
+        });
+    </script>
+  </body>
+</html>
