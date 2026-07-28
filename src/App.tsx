@@ -29,6 +29,7 @@ import {
 import { createDraftPost, createPlan, getScheduleError, loadPlan, parsePlan, savePlan, type Channel, type Post, type Status } from './content-store'
 import { AuthScreen } from './AuthScreen'
 import { loadRemotePosts, prepareUser, saveRemotePosts } from './remote-store'
+import { deleteMediaAsset, loadMediaAssets, uploadMediaAsset, type MediaAsset } from './media-store'
 import { supabase } from './supabase'
 
 type View = 'queue' | 'calendar' | 'accounts' | 'settings'
@@ -112,6 +113,8 @@ function App() {
   const [editingPost, setEditingPost] = useState<Post | null>(null)
   const [selectedPostId, setSelectedPostId] = useState<string | null>(initialPlan.posts[0]?.id ?? null)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([])
+  const [mediaBusy, setMediaBusy] = useState(false)
   const noticeTimer = useRef<number | undefined>(undefined)
   const editingOriginal = useRef<Post | null>(null)
   const isNewDraft = useRef(false)
@@ -142,11 +145,12 @@ function App() {
     if (!session) return
     let cancelled = false
     setSyncState('syncing')
-    Promise.all([prepareUser(session.user), loadRemotePosts(session.user.id)])
-      .then(async ([, remotePosts]) => {
+    Promise.all([prepareUser(session.user), loadRemotePosts(session.user.id), loadMediaAssets(session.user.id)])
+      .then(async ([, remotePosts, remoteMedia]) => {
         if (cancelled) return
         if (remotePosts.length) setPosts(remotePosts)
         else await saveRemotePosts(session.user.id, initialPlan.posts)
+        setMediaAssets(remoteMedia)
         if (!cancelled) {
           setRemoteReady(true)
           setSyncState('synced')
@@ -215,6 +219,8 @@ function App() {
   }).sort((a, b) => `${a.scheduledDate}T${a.scheduledTime}`.localeCompare(`${b.scheduledDate}T${b.scheduledTime}`)), [filter, posts])
 
   const selectedPost = useMemo(() => posts.find((post) => post.id === selectedPostId) ?? visiblePosts[0] ?? posts[0] ?? null, [posts, selectedPostId, visiblePosts])
+  const selectedMedia = useMemo(() => mediaAssets.find((asset) => asset.postId === selectedPost?.id) ?? null, [mediaAssets, selectedPost?.id])
+  const editingMedia = useMemo(() => mediaAssets.filter((asset) => asset.postId === editingPost?.id), [editingPost?.id, mediaAssets])
 
   const showNotice = (message: string) => {
     if (noticeTimer.current) window.clearTimeout(noticeTimer.current)
@@ -340,8 +346,16 @@ function App() {
     }
   }
 
-  const deletePost = (post: Post) => {
+  const deletePost = async (post: Post) => {
     if (!window.confirm(`Удалить черновик «${post.title || 'Без названия'}»?`)) return
+    const attached = mediaAssets.filter((asset) => asset.postId === post.id)
+    try {
+      await Promise.all(attached.map(deleteMediaAsset))
+      setMediaAssets((current) => current.filter((asset) => asset.postId !== post.id))
+    } catch {
+      showNotice('Не удалось удалить прикреплённые файлы. Материал сохранён.')
+      return
+    }
     setPosts((current) => current.filter((item) => item.id !== post.id))
     if (selectedPostId === post.id) setSelectedPostId(null)
     showNotice('Черновик удалён.')
@@ -356,6 +370,36 @@ function App() {
       ...current,
       channels: checked ? [...new Set([...current.channels, channel])] : current.channels.filter((item) => item !== channel),
     } : current)
+  }
+
+  const uploadMedia = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !session || !editingPost || isNewDraft.current) return
+    setMediaBusy(true)
+    try {
+      const asset = await uploadMediaAsset(session.user.id, editingPost.id, file)
+      setMediaAssets((current) => [...current, asset])
+      showNotice('Медиа загружено в приватное хранилище.')
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : 'Не удалось загрузить медиа.')
+    } finally {
+      setMediaBusy(false)
+    }
+  }
+
+  const removeMedia = async (asset: MediaAsset) => {
+    if (!window.confirm('Удалить этот файл без возможности восстановления?')) return
+    setMediaBusy(true)
+    try {
+      await deleteMediaAsset(asset)
+      setMediaAssets((current) => current.filter((item) => item.id !== asset.id))
+      showNotice('Медиа удалено.')
+    } catch {
+      showNotice('Не удалось удалить медиа.')
+    } finally {
+      setMediaBusy(false)
+    }
   }
 
   const activeMeta = viewMeta[view]
@@ -413,7 +457,7 @@ function App() {
 
             <aside className="preview-column">{selectedPost ? <>
               <div className="preview-head"><div><span>ПРЕВЬЮ · {accountName(selectedPost.accountId).toUpperCase()}</span><strong>{formatPostDate(selectedPost).full} · {selectedPost.scheduledTime}</strong></div><em><Clock3 />{statusLabels[selectedPost.status]} · v{selectedPost.version}</em></div>
-              <div className="creative-preview"><Mark /><span className="preview-label">{selectedPost.pillar.toUpperCase()}</span><h3>{selectedPost.title || 'БЕЗ НАЗВАНИЯ'}</h3><p>{selectedPost.hook || 'Добавьте хук в редакторе материала.'}</p><div className="preview-foot"><b>{selectedPost.channels.join(' · ').toUpperCase()}</b><span>{safeHostname(selectedPost.destinationUrl)}</span></div></div>
+              <div className={`creative-preview ${selectedMedia ? 'creative-preview--media' : ''}`}>{selectedMedia && (selectedMedia.mimeType.startsWith('image/') ? <img src={selectedMedia.signedUrl} alt="Загруженный креатив" /> : <video src={selectedMedia.signedUrl} controls preload="metadata" />)}<div className="creative-overlay"><Mark /><span className="preview-label">{selectedPost.pillar.toUpperCase()}</span><h3>{selectedPost.title || 'БЕЗ НАЗВАНИЯ'}</h3><p>{selectedPost.hook || 'Добавьте хук в редакторе материала.'}</p><div className="preview-foot"><b>{selectedPost.channels.join(' · ').toUpperCase()}</b><span>{safeHostname(selectedPost.destinationUrl)}</span></div></div></div>
               <div className="caption-preview"><span>ТЕКСТ ПУБЛИКАЦИИ</span><p>{captionExpanded ? (selectedPost.facebookCaption || selectedPost.instagramCaption || selectedPost.hook) : (selectedPost.facebookCaption || selectedPost.instagramCaption || selectedPost.hook).slice(0, 150)}</p>{selectedPost.cta && <strong className="preview-cta">CTA: {selectedPost.cta}</strong>}<button aria-expanded={captionExpanded} onClick={() => setCaptionExpanded((current) => !current)}>{captionExpanded ? 'Свернуть текст' : 'Посмотреть весь текст'} <ChevronRight /></button></div>
             </> : <div className="empty-state"><Eye /><h3>Выберите материал</h3><p>Превью будет связано с выбранной версией.</p></div>}</aside>
           </section>
@@ -450,6 +494,11 @@ function App() {
             <label className="field field--wide"><span>Текст Instagram</span><textarea name="instagramCaption" autoComplete="off" rows={4} value={editingPost.instagramCaption} onChange={(event) => updateEditingPost({ instagramCaption: event.target.value })} placeholder="Полный текст для Instagram…" /></label>
             <label className="field"><span>CTA</span><input name="cta" autoComplete="off" value={editingPost.cta} onChange={(event) => updateEditingPost({ cta: event.target.value })} placeholder="Получить аудит…" /></label>
             <label className="field"><span>HTTPS-ссылка</span><input name="destinationUrl" type="url" inputMode="url" autoComplete="off" aria-invalid={Boolean(formErrors.destinationUrl)} value={editingPost.destinationUrl} onChange={(event) => updateEditingPost({ destinationUrl: event.target.value })} placeholder="https://rocket-peak.com/…" />{formErrors.destinationUrl && <small className="field-error">{formErrors.destinationUrl}</small>}</label>
+            <section className="media-field field--wide" aria-label="Медиа публикации">
+              <div><span>МЕДИА</span><small>JPG, PNG, WebP до 10 МБ · MP4, MOV до 100 МБ</small></div>
+              {isNewDraft.current ? <p>Сначала сохраните новый материал, затем откройте его и загрузите файл.</p> : <label className={`media-upload ${mediaBusy ? 'is-busy' : ''}`}><Upload />{mediaBusy ? 'Загрузка…' : 'Загрузить файл'}<input type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" onChange={uploadMedia} disabled={mediaBusy} /></label>}
+              {editingMedia.length > 0 && <div className="media-list">{editingMedia.map((asset) => <article key={asset.id}>{asset.mimeType.startsWith('image/') ? <img src={asset.signedUrl} alt="Прикреплённый креатив" /> : <video src={asset.signedUrl} preload="metadata" />}<div><strong>{asset.mimeType.startsWith('image/') ? 'Изображение' : 'Видео'}</strong><span>{asset.width}×{asset.height} · {(asset.sizeBytes / 1024 / 1024).toFixed(1)} МБ{asset.durationSeconds ? ` · ${asset.durationSeconds.toFixed(1)} сек` : ''}</span></div><button type="button" onClick={() => removeMedia(asset)} disabled={mediaBusy} aria-label="Удалить медиа"><Trash2 /></button></article>)}</div>}
+            </section>
             {editingOriginal.current?.status === 'approved' && <div className="approval-warning field--wide"><CircleAlert /><span>После сохранения версия увеличится, а прежнее согласование будет аннулировано.</span></div>}
             <div className="editor-actions"><span>{hasUnsavedChanges ? 'Есть несохранённые изменения' : 'Изменений нет'}</span><button type="button" className="button secondary" onClick={closeEditor}>Отмена</button><button className="button primary" type="submit"><Check />Сохранить черновик</button></div>
           </form>
