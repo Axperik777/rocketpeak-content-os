@@ -173,6 +173,18 @@ function App() {
     return () => window.clearTimeout(timer)
   }, [posts, remoteReady, session?.user.id])
 
+  useEffect(() => {
+    if (!session || !remoteReady || !supabase || new URLSearchParams(window.location.search).get('edgeProbe') !== '1') return
+    let cancelled = false
+    supabase.functions.invoke('validate-media', { body: { probe: true } })
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error || data?.status !== 'ok' || data?.authenticated !== true) setNotice('Серверный валидатор недоступен.')
+        else setNotice('Серверный валидатор работает и принимает только авторизованные запросы.')
+      })
+    return () => { cancelled = true }
+  }, [remoteReady, session])
+
   const hasUnsavedChanges = useMemo(() => editingPost !== null && JSON.stringify(editingPost) !== JSON.stringify(editingOriginal.current), [editingPost])
 
   useEffect(() => {

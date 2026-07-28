@@ -51,7 +51,8 @@ Deno.serve(async (request) => {
   const { data: userData, error: userError } = await userClient.auth.getUser()
   if (userError || !userData.user) return json({ error: 'unauthorized' }, 401)
 
-  const body = await request.json().catch(() => null) as { assetId?: string } | null
+  const body = await request.json().catch(() => null) as { assetId?: string; probe?: boolean } | null
+  if (body?.probe === true) return json({ status: 'ok', authenticated: true })
   if (!body?.assetId) return json({ error: 'asset_id_required' }, 400)
 
   const admin = createClient(supabaseUrl, serviceKey)
