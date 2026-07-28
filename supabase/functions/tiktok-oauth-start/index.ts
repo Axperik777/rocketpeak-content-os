@@ -1,5 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { sha256 } from '../_shared/token-crypto.ts'
+
+const encoder = new TextEncoder()
+async function sha256(value: string) {
+  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(value))
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+}
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },

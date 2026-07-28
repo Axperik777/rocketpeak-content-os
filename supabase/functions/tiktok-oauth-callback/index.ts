@@ -1,5 +1,25 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { encryptToken, sha256 } from '../_shared/token-crypto.ts'
+
+const encoder = new TextEncoder()
+function bytesToPostgresHex(bytes: Uint8Array) {
+  return `\\x${[...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('')}`
+}
+async function encryptionKey() {
+  const encoded = Deno.env.get('TOKEN_ENCRYPTION_KEY')
+  if (!encoded) throw new Error('token_encryption_key_missing')
+  const raw = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))
+  if (raw.byteLength !== 32) throw new Error('token_encryption_key_invalid')
+  return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt'])
+}
+async function encryptToken(value: string) {
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await encryptionKey(), encoder.encode(value))
+  return { ciphertext: bytesToPostgresHex(new Uint8Array(ciphertext)), iv: bytesToPostgresHex(iv) }
+}
+async function sha256(value: string) {
+  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(value))
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+}
 
 const html = (message: string, status = 200) => new Response(`<!doctype html><meta charset="utf-8"><title>RocketPeak</title><body style="font:16px system-ui;background:#10130f;color:#f5f4ef;padding:40px"><h1>${message}</h1><p>Эту вкладку можно закрыть.</p></body>`, { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
 

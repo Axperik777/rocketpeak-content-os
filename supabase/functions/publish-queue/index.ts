@@ -1,5 +1,29 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { decryptToken, encryptToken } from '../_shared/token-crypto.ts'
+
+const tokenEncoder = new TextEncoder()
+function bytesToPostgresHex(bytes: Uint8Array) {
+  return `\\x${[...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('')}`
+}
+function postgresHexToBytes(value: string) {
+  const hex = value.startsWith('\\x') ? value.slice(2) : value
+  return Uint8Array.from(hex.match(/.{2}/g) ?? [], (pair) => Number.parseInt(pair, 16))
+}
+async function encryptionKey() {
+  const encoded = Deno.env.get('TOKEN_ENCRYPTION_KEY')
+  if (!encoded) throw new Error('token_encryption_key_missing')
+  const raw = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))
+  if (raw.byteLength !== 32) throw new Error('token_encryption_key_invalid')
+  return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt'])
+}
+async function encryptToken(value: string) {
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await encryptionKey(), tokenEncoder.encode(value))
+  return { ciphertext: bytesToPostgresHex(new Uint8Array(ciphertext)), iv: bytesToPostgresHex(iv) }
+}
+async function decryptToken(ciphertext: string, iv: string) {
+  const clear = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: postgresHexToBytes(iv) }, await encryptionKey(), postgresHexToBytes(ciphertext))
+  return new TextDecoder().decode(clear)
+}
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 const retryableCodes = new Set(['rate_limit_exceeded', 'internal_error', 'server_error'])
