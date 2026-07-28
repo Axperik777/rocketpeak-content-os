@@ -135,7 +135,12 @@ export async function uploadMediaAsset(ownerId: string, postId: string, file: Fi
     await client.storage.from(bucket).remove([storagePath])
     throw inserted.error
   }
-  return withSignedUrl(inserted.data as MediaRow)
+  const asset = await withSignedUrl(inserted.data as MediaRow)
+  const validation = await client.functions.invoke('validate-media', { body: { assetId: asset.id } })
+  if (validation.error) return asset
+  const refreshed = await client.from('media_assets').select('*').eq('id', asset.id).single()
+  if (refreshed.error) return asset
+  return withSignedUrl(refreshed.data as MediaRow)
 }
 
 export async function deleteMediaAsset(asset: MediaAsset) {
