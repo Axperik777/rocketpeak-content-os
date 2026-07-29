@@ -84,6 +84,12 @@ function accountName(accountId: string) {
   return accounts.find((account) => account.id === accountId)?.name ?? 'Неизвестный аккаунт'
 }
 
+function errorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message
+  if (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string') return error.message
+  return fallback
+}
+
 function formatPostDate(post: Post) {
   const date = new Date(`${post.scheduledDate}T12:00:00`)
   return {
@@ -164,7 +170,7 @@ function App() {
       .catch((error) => {
         if (!cancelled) {
           setSyncState('error')
-          setSyncError(error instanceof Error ? error.message : 'Не удалось загрузить данные из Supabase')
+          setSyncError(errorMessage(error, 'Не удалось загрузить данные из Supabase'))
         }
       })
     return () => { cancelled = true }
@@ -181,7 +187,7 @@ function App() {
         })
         .catch((error) => {
           setSyncState('error')
-          setSyncError(error instanceof Error ? error.message : 'Не удалось сохранить данные в Supabase')
+          setSyncError(errorMessage(error, 'Не удалось сохранить данные в Supabase'))
         })
     }, 500)
     return () => window.clearTimeout(timer)
@@ -313,7 +319,7 @@ function App() {
         showNotice('Согласовано. Задача публикации добавлена в серверную очередь.')
       } catch (error) {
         setPosts(posts)
-        showNotice(error instanceof Error ? error.message : 'Не удалось поставить публикацию в очередь.')
+        showNotice(errorMessage(error, 'Не удалось поставить публикацию в очередь.'))
       }
       return
     }
@@ -397,7 +403,7 @@ function App() {
         await saveRemotePosts(session.user.id, updatedPosts)
       } catch (error) {
         setSyncState('error')
-        setSyncError(error instanceof Error ? error.message : 'Не удалось сохранить материал в Supabase')
+        setSyncError(errorMessage(error, 'Не удалось сохранить материал в Supabase'))
         showNotice('Материал не сохранён. Причина указана внизу слева.')
         return
       }
