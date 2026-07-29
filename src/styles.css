@@ -68,10 +68,10 @@ main { min-width: 0; padding: 32px clamp(24px, 3.2vw, 56px) 56px; overflow: hidd
 .button.secondary { color: var(--text); background: var(--surface); border: 1px solid var(--line-bright); }
 .button.primary { color: var(--signal-ink); background: var(--signal); border: 1px solid var(--signal); }
 .toast { position: fixed; z-index: 50; top: 22px; right: 24px; max-width: min(440px, calc(100vw - 32px)); padding: 13px 16px; display: flex; gap: 10px; align-items: center; color: var(--signal-ink); background: var(--signal); border-radius: 12px; box-shadow: var(--shadow); font-size: 13px; font-weight: 700; animation: toast-in 220ms ease-out; }
-.editor-backdrop { position: fixed; z-index: 60; inset: 0; padding: 24px; display: grid; place-items: center; overflow-y: auto; overscroll-behavior: contain; background: rgba(5, 6, 5, .78); backdrop-filter: blur(8px); }
-.post-editor { width: min(760px, 100%); max-height: calc(100vh - 48px); padding: 24px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; overflow-y: auto; overscroll-behavior: contain; color: var(--text); background: var(--surface); border: 1px solid var(--line-bright); border-radius: var(--radius-lg); box-shadow: var(--shadow); }
+.editor-backdrop { position: fixed; z-index: 60; inset: 0; padding: 24px; display: grid; place-items: center; overflow: hidden; background: rgba(5, 6, 5, .78); backdrop-filter: blur(8px); }
+.post-editor { width: min(760px, 100%); height: calc(100dvh - 48px); max-height: calc(100dvh - 48px); padding: 24px; display: grid; align-content: start; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: auto; scrollbar-gutter: stable; -webkit-overflow-scrolling: touch; color: var(--text); background: var(--surface); border: 1px solid var(--line-bright); border-radius: var(--radius-lg); box-shadow: var(--shadow); }
 .editor-head, .editor-actions, .field--wide { grid-column: 1 / -1; }
-.editor-head { display: flex; align-items: flex-start; justify-content: space-between; }
+.editor-head { position: sticky; z-index: 3; top: -24px; margin: -24px -24px 0; padding: 24px 24px 12px; display: flex; align-items: flex-start; justify-content: space-between; background: linear-gradient(180deg, var(--surface) 82%, transparent); }
 .editor-head h2 { margin: 4px 0 0; font: 650 25px Bahnschrift, sans-serif; }
 .editor-head > button { width: 44px; height: 44px; color: var(--text-2); background: transparent; border: 1px solid var(--line-bright); border-radius: 10px; cursor: pointer; font-size: 24px; }
 .field { min-width: 0; display: grid; gap: 7px; }
@@ -87,7 +87,7 @@ main { min-width: 0; padding: 32px clamp(24px, 3.2vw, 56px) 56px; overflow: hidd
 .channel-field input { width: 16px; min-height: 16px; accent-color: var(--signal); }
 .approval-warning { min-height: 48px; padding: 11px 13px; display: flex; align-items: center; gap: 9px; color: #ffd2c3; background: #2b1712; border: 1px solid #673122; border-radius: 10px; font-size: 11px; }
 .approval-warning svg { flex: 0 0 auto; color: var(--ember); }
-.editor-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; padding-top: 4px; }
+.editor-actions { position: sticky; z-index: 3; bottom: -24px; margin: 0 -24px -24px; padding: 12px 24px 24px; display: flex; justify-content: flex-end; align-items: center; gap: 10px; background: linear-gradient(0deg, var(--surface) 82%, transparent); }
 .editor-actions > span { margin-right: auto; color: var(--text-3); font-size: 10px; }
 .media-field { padding: 15px; display: grid; gap: 12px; background: var(--surface-soft); border: 1px solid var(--line-bright); border-radius: 11px; }
 .media-field > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -317,7 +317,9 @@ main { min-width: 0; padding: 32px clamp(24px, 3.2vw, 56px) 56px; overflow: hidd
 
 @media (max-width: 520px) {
   .editor-backdrop { padding: 0; place-items: end center; }
-  .post-editor { max-height: 94vh; padding: 18px; grid-template-columns: 1fr; overflow-y: auto; border-radius: 18px 18px 0 0; }
+  .post-editor { height: 94dvh; max-height: 94dvh; padding: 18px; grid-template-columns: 1fr; overflow-y: auto; border-radius: 18px 18px 0 0; }
+  .editor-head { top: -18px; margin: -18px -18px 0; padding: 18px 18px 10px; }
+  .editor-actions { bottom: -18px; margin: 0 -18px -18px; padding: 10px 18px 18px; }
   .editor-head, .editor-actions, .field--wide { grid-column: 1; }
   .editor-actions { align-items: stretch; flex-direction: column; }
   .editor-actions > span { margin-right: 0; }
