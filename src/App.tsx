@@ -347,7 +347,7 @@ function App() {
     setFormErrors({})
   }
 
-  const savePost = (event: React.FormEvent<HTMLFormElement>) => {
+  const savePost = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!editingPost) return
     const errors: Record<string, string> = {}
@@ -388,7 +388,21 @@ function App() {
       approval: null,
       updatedAt: changedAt,
     }
-    setPosts((current) => creating ? [cleaned, ...current] : current.map((post) => post.id === cleaned.id ? cleaned : post))
+    const alreadyStored = posts.some((post) => post.id === cleaned.id)
+    const updatedPosts = alreadyStored
+      ? posts.map((post) => post.id === cleaned.id ? cleaned : post)
+      : [cleaned, ...posts]
+    if (session) {
+      try {
+        await saveRemotePosts(session.user.id, updatedPosts)
+      } catch (error) {
+        setSyncState('error')
+        setSyncError(error instanceof Error ? error.message : 'Не удалось сохранить материал в Supabase')
+        showNotice('Материал не сохранён. Причина указана внизу слева.')
+        return
+      }
+    }
+    setPosts(updatedPosts)
     setSelectedPostId(cleaned.id)
     editingOriginal.current = null
     isNewDraft.current = false
