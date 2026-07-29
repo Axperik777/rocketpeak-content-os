@@ -2,6 +2,17 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import type { Channel, Post, Status } from './content-store'
 
+export type PublicationJob = {
+  id: string
+  postId: string
+  postVersion: number
+  channel: Channel
+  state: 'pending' | 'processing' | 'published' | 'failed' | 'cancelled'
+  publishedAt: string | null
+  remotePostId: string | null
+  lastErrorCode: string | null
+}
+
 type PostRow = {
   id: string
   owner_id: string
@@ -19,6 +30,13 @@ type PostRow = {
   instagram_caption: string
   tiktok_caption: string
   tiktok_privacy: Post['tiktokPrivacy']
+  tiktok_allow_comment: boolean
+  tiktok_allow_duet: boolean
+  tiktok_allow_stitch: boolean
+  tiktok_commercial_content: boolean
+  tiktok_your_brand: boolean
+  tiktok_branded_content: boolean
+  tiktok_music_consent: boolean
   cta: string
   destination_url: string
   approved_version: number | null
@@ -59,7 +77,14 @@ function fromRow(row: PostRow): Post {
     facebookCaption: row.facebook_caption,
     instagramCaption: row.instagram_caption,
     tiktokCaption: row.tiktok_caption ?? row.instagram_caption,
-    tiktokPrivacy: row.tiktok_privacy ?? 'SELF_ONLY',
+    tiktokPrivacy: row.tiktok_privacy ?? '',
+    tiktokAllowComment: row.tiktok_allow_comment ?? false,
+    tiktokAllowDuet: row.tiktok_allow_duet ?? false,
+    tiktokAllowStitch: row.tiktok_allow_stitch ?? false,
+    tiktokCommercialContent: row.tiktok_commercial_content ?? false,
+    tiktokYourBrand: row.tiktok_your_brand ?? false,
+    tiktokBrandedContent: row.tiktok_branded_content ?? false,
+    tiktokMusicConsent: row.tiktok_music_consent ?? false,
     cta: row.cta,
     destinationUrl: row.destination_url,
     approval: row.approved_version && row.approved_at ? { version: row.approved_version, approvedAt: row.approved_at } : null,
@@ -86,6 +111,13 @@ function toRow(post: Post, ownerId: string) {
     instagram_caption: post.instagramCaption,
     tiktok_caption: post.tiktokCaption,
     tiktok_privacy: post.tiktokPrivacy,
+    tiktok_allow_comment: post.tiktokAllowComment,
+    tiktok_allow_duet: post.tiktokAllowDuet,
+    tiktok_allow_stitch: post.tiktokAllowStitch,
+    tiktok_commercial_content: post.tiktokCommercialContent,
+    tiktok_your_brand: post.tiktokYourBrand,
+    tiktok_branded_content: post.tiktokBrandedContent,
+    tiktok_music_consent: post.tiktokMusicConsent,
     cta: post.cta,
     destination_url: post.destinationUrl,
     approved_version: post.approval?.version ?? null,
@@ -123,4 +155,11 @@ export async function saveRemotePosts(ownerId: string, posts: Post[]) {
   if (!posts.length) return
   const saved = await supabase.from('posts').upsert(posts.map((post) => toRow(post, ownerId)))
   if (saved.error) throw saved.error
+}
+
+export async function loadPublicationJobs(ownerId: string): Promise<PublicationJob[]> {
+  if (!supabase) throw new Error('Supabase не настроен')
+  const result = await supabase.from('publication_jobs').select('id,post_id,post_version,channel,state,published_at,remote_post_id,last_error_code').eq('owner_id', ownerId).order('created_at', { ascending: false })
+  if (result.error) throw result.error
+  return result.data.map((row) => ({ id: row.id, postId: row.post_id, postVersion: row.post_version, channel: row.channel as Channel, state: row.state, publishedAt: row.published_at, remotePostId: row.remote_post_id, lastErrorCode: row.last_error_code }))
 }

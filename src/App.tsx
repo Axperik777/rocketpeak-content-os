@@ -29,12 +29,22 @@ import {
 } from 'lucide-react'
 import { createDraftPost, createPlan, getScheduleError, loadPlan, parsePlan, savePlan, type Channel, type Post, type Status } from './content-store'
 import { AuthScreen } from './AuthScreen'
-import { loadRemotePosts, prepareUser, saveRemotePosts } from './remote-store'
+import { loadPublicationJobs, loadRemotePosts, prepareUser, saveRemotePosts, type PublicationJob } from './remote-store'
 import { deleteMediaAsset, loadMediaAssets, revalidateMediaAsset, uploadMediaAsset, type MediaAsset } from './media-store'
 import { supabase } from './supabase'
 
 type View = 'queue' | 'calendar' | 'accounts' | 'settings'
 type Filter = 'all' | 'review' | 'draft' | 'ready' | 'skipped'
+type TikTokCreatorInfo = {
+  nickname: string
+  username: string
+  avatarUrl?: string
+  privacyOptions: Post['tiktokPrivacy'][]
+  commentDisabled: boolean
+  duetDisabled: boolean
+  stitchDisabled: boolean
+  maxVideoDurationSec?: number
+}
 
 type Account = {
   id: string
@@ -65,6 +75,13 @@ const viewMeta: Record<View, { label: string; title: string; description: string
 const statusLabels: Record<Status, string> = { draft: 'Черновик', review: 'Нужно решение', approved: 'Согласовано', skipped: 'Пропущено' }
 const validViews: View[] = ['queue', 'calendar', 'accounts', 'settings']
 const initialPlan = loadPlan()
+const privacyLabels: Record<Post['tiktokPrivacy'], string> = {
+  '': 'Выберите видимость',
+  SELF_ONLY: 'Только я',
+  FOLLOWER_OF_CREATOR: 'Подписчики',
+  MUTUAL_FOLLOW_FRIENDS: 'Друзья',
+  PUBLIC_TO_EVERYONE: 'Все пользователи',
+}
 
 function getInitialView(): View {
   const hash = window.location.hash.slice(1) as View
@@ -125,6 +142,10 @@ function App() {
   const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([])
   const [mediaBusy, setMediaBusy] = useState(false)
   const [tiktokStatus, setTiktokStatus] = useState('disconnected')
+  const [tiktokCreator, setTiktokCreator] = useState<TikTokCreatorInfo | null>(null)
+  const [tiktokCreatorError, setTiktokCreatorError] = useState('')
+  const [tiktokCreatorLoading, setTiktokCreatorLoading] = useState(false)
+  const [publicationJobs, setPublicationJobs] = useState<PublicationJob[]>([])
   const noticeTimer = useRef<number | undefined>(undefined)
   const validationAttempts = useRef(new Set<string>())
   const editingOriginal = useRef<Post | null>(null)
@@ -216,6 +237,34 @@ function App() {
 
   useEffect(() => {
     if (!session || !remoteReady) return
+    let cancelled = false
+    const refresh = () => loadPublicationJobs(session.user.id).then((jobs) => { if (!cancelled) setPublicationJobs(jobs) }).catch(() => undefined)
+    refresh()
+    const timer = window.setInterval(refresh, 15_000)
+    return () => { cancelled = true; window.clearInterval(timer) }
+  }, [remoteReady, session?.user.id])
+
+  useEffect(() => {
+    if (!editingPost?.channels.includes('TikTok') || !supabase || tiktokStatus !== 'connected') return
+    let cancelled = false
+    setTiktokCreatorLoading(true)
+    setTiktokCreatorError('')
+    supabase.functions.invoke('tiktok-creator-info', { body: {} }).then(({ data, error }) => {
+      if (cancelled) return
+      if (error || !data?.nickname || !Array.isArray(data.privacyOptions)) {
+        setTiktokCreator(null)
+        setTiktokCreatorError('Не удалось получить актуальные настройки TikTok. Публикацию нельзя согласовать.')
+      } else {
+        setTiktokCreator(data as TikTokCreatorInfo)
+        if (editingPost.tiktokPrivacy && !data.privacyOptions.includes(editingPost.tiktokPrivacy)) updateEditingPost({ tiktokPrivacy: '' })
+      }
+      setTiktokCreatorLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [editingPost?.id, editingPost?.channels.join('|'), tiktokStatus])
+
+  useEffect(() => {
+    if (!session || !remoteReady) return
     const pending = mediaAssets.filter((asset) => asset.validationStatus === 'client_checked' && !validationAttempts.current.has(asset.id))
     if (!pending.length) return
     pending.forEach((asset) => validationAttempts.current.add(asset.id))
@@ -275,6 +324,11 @@ function App() {
   const selectedPost = useMemo(() => posts.find((post) => post.id === selectedPostId) ?? visiblePosts[0] ?? posts[0] ?? null, [posts, selectedPostId, visiblePosts])
   const selectedMedia = useMemo(() => mediaAssets.find((asset) => asset.postId === selectedPost?.id) ?? null, [mediaAssets, selectedPost?.id])
   const editingMedia = useMemo(() => mediaAssets.filter((asset) => asset.postId === editingPost?.id), [editingPost?.id, mediaAssets])
+  const latestJobByPost = useMemo(() => {
+    const map = new Map<string, PublicationJob>()
+    for (const job of publicationJobs) if (!map.has(job.postId)) map.set(job.postId, job)
+    return map
+  }, [publicationJobs])
 
   const showNotice = (message: string) => {
     if (noticeTimer.current) window.clearTimeout(noticeTimer.current)
@@ -311,6 +365,10 @@ function App() {
         showNotice(tiktokMedia.validationStatus === 'failed' ? 'Видео не прошло серверную проверку.' : 'Дождитесь завершения серверной проверки видео.')
         return
       }
+      if (!currentPost.tiktokPrivacy) { showNotice('Выберите видимость TikTok в редакторе.'); return }
+      if (!currentPost.tiktokMusicConsent) { showNotice('Подтвердите правила использования музыки TikTok.'); return }
+      if (currentPost.tiktokCommercialContent && !currentPost.tiktokYourBrand && !currentPost.tiktokBrandedContent) { showNotice('Укажите тип коммерческого контента TikTok.'); return }
+      if (currentPost.tiktokBrandedContent && currentPost.tiktokPrivacy === 'SELF_ONLY') { showNotice('Платное партнёрство нельзя публиковать с видимостью «Только я».'); return }
     }
     const changedAt = new Date().toISOString()
     const updatedPosts = posts.map((post) => post.id === id ? {
@@ -330,6 +388,7 @@ function App() {
           const queued = await supabase.rpc('enqueue_publication', { p_post_id: approvedPost.id, p_channel: channel })
           if (queued.error) throw queued.error
         }
+        setPublicationJobs(await loadPublicationJobs(session.user.id))
         showNotice('Согласовано. Задача публикации добавлена в серверную очередь.')
       } catch (error) {
         setPosts(posts)
@@ -382,6 +441,13 @@ function App() {
       if (scheduleError) errors.scheduledDate = scheduleError
     }
     if (editingPost.channels.length === 0) errors.channels = 'Выберите хотя бы один канал.'
+    if (editingPost.channels.includes('TikTok')) {
+      if (!editingPost.tiktokCaption.trim()) errors.tiktokCaption = 'Добавьте подпись TikTok.'
+      if (!editingPost.tiktokPrivacy) errors.tiktokPrivacy = 'Выберите видимость вручную.'
+      if (!editingPost.tiktokMusicConsent) errors.tiktokMusicConsent = 'Подтвердите правила использования музыки.'
+      if (editingPost.tiktokCommercialContent && !editingPost.tiktokYourBrand && !editingPost.tiktokBrandedContent) errors.tiktokCommercial = 'Выберите «Мой бренд», «Платное партнёрство» или оба варианта.'
+      if (editingPost.tiktokBrandedContent && editingPost.tiktokPrivacy === 'SELF_ONLY') errors.tiktokPrivacy = 'Платное партнёрство нельзя публиковать с видимостью «Только я».'
+    }
     if (editingPost.destinationUrl && !/^https:\/\//i.test(editingPost.destinationUrl)) errors.destinationUrl = 'Ссылка должна начинаться с https://.'
     if (Object.keys(errors).length) {
       setFormErrors(errors)
@@ -568,9 +634,9 @@ function App() {
               </div>
               <div className="post-list">
                 {visiblePosts.length === 0 && <div className="empty-state"><CheckCircle2 /><h3>Здесь всё разобрано</h3><p>Выберите другой фильтр или создайте новый материал.</p></div>}
-                {visiblePosts.map((post) => { const postDate = formatPostDate(post); return <article className={`post-row post-row--${post.status} ${selectedPost?.id === post.id ? 'post-row--selected' : ''}`} key={post.id}>
+                {visiblePosts.map((post) => { const postDate = formatPostDate(post); const job = latestJobByPost.get(post.id); return <article className={`post-row post-row--${post.status} ${selectedPost?.id === post.id ? 'post-row--selected' : ''}`} key={post.id}>
                   <div className="date-block"><strong>{postDate.day}</strong><span>{postDate.month}</span><small>{post.scheduledTime}</small></div>
-                  <div className="post-body"><div className="post-meta"><span>{post.pillar}</span><i>{post.format}</i><em className={`status status--${post.status}`}>{statusLabels[post.status]}</em></div><h3>{post.title}</h3><p>{post.hook}</p><div className="route"><b>{accountName(post.accountId)}</b>{post.channels.map((channel) => <ChannelIcon channel={channel} key={channel} />)}<small>v{post.version}</small></div></div>
+                  <div className="post-body"><div className="post-meta"><span>{post.pillar}</span><i>{post.format}</i><em className={`status status--${job?.state ?? post.status}`}>{job ? (job.state === 'pending' ? 'В очереди' : job.state === 'processing' ? 'Отправляется' : job.state === 'published' ? 'Опубликовано' : job.state === 'failed' ? 'Ошибка публикации' : 'Отменено') : statusLabels[post.status]}</em></div><h3>{post.title}</h3><p>{post.hook}</p>{job?.state === 'failed' && <small className="publication-error">{job.lastErrorCode ?? 'Неизвестная ошибка'}</small>}<div className="route"><b>{accountName(post.accountId)}</b>{post.channels.map((channel) => <ChannelIcon channel={channel} key={channel} />)}<small>v{post.version}</small></div></div>
                   <div className="row-actions"><button onClick={() => { setSelectedPostId(post.id); setCaptionExpanded(false) }}><Eye />Превью</button>{post.status === 'review' ? <><button className="approve" onClick={() => changeStatus(post.id, 'approved')}><Check />Согласовать</button><button onClick={() => openEditor(post)}><Pencil />Исправить</button><button onClick={() => changeStatus(post.id, 'skipped')}><SkipForward />Пропустить</button></> : post.status === 'skipped' ? <button onClick={() => changeStatus(post.id, 'draft')}><FileText />Вернуть</button> : <><button onClick={() => openEditor(post)}><Pencil />Редактировать</button>{post.status === 'draft' && <button onClick={() => deletePost(post)}><Trash2 />Удалить</button>}<button onClick={() => changeStatus(post.id, 'review')}><FileText />На проверку</button></>}</div>
                 </article> })}
               </div>
@@ -623,8 +689,29 @@ function App() {
             <fieldset className="field channel-field" aria-invalid={Boolean(formErrors.channels)}><legend>Каналы</legend>{(['Facebook', 'Instagram', 'TikTok'] as Channel[]).map((channel) => <label key={channel}><input name="channels" type="checkbox" checked={editingPost.channels.includes(channel)} onChange={(event) => updateEditingChannel(channel, event.target.checked)} />{channel}</label>)}{formErrors.channels && <small className="field-error">{formErrors.channels}</small>}</fieldset>
             <label className="field field--wide"><span>Текст Facebook</span><textarea name="facebookCaption" autoComplete="off" rows={4} value={editingPost.facebookCaption} onChange={(event) => updateEditingPost({ facebookCaption: event.target.value })} placeholder="Полный текст для Facebook…" /></label>
             <label className="field field--wide"><span>Текст Instagram</span><textarea name="instagramCaption" autoComplete="off" rows={4} value={editingPost.instagramCaption} onChange={(event) => updateEditingPost({ instagramCaption: event.target.value })} placeholder="Полный текст для Instagram…" /></label>
-            <label className="field field--wide"><span>Текст TikTok</span><textarea name="tiktokCaption" autoComplete="off" rows={3} value={editingPost.tiktokCaption} onChange={(event) => updateEditingPost({ tiktokCaption: event.target.value })} placeholder="Подпись и хэштеги для TikTok…" /></label>
-            {editingPost.channels.includes('TikTok') && <label className="field"><span>Видимость TikTok</span><select name="tiktokPrivacy" value={editingPost.tiktokPrivacy} onChange={(event) => updateEditingPost({ tiktokPrivacy: event.target.value as Post['tiktokPrivacy'] })}><option value="SELF_ONLY">Только я · тест</option><option value="MUTUAL_FOLLOW_FRIENDS">Друзья</option><option value="PUBLIC_TO_EVERYONE">Публично</option></select></label>}
+            <label className="field field--wide"><span>Текст TikTok</span><textarea name="tiktokCaption" autoComplete="off" rows={3} aria-invalid={Boolean(formErrors.tiktokCaption)} value={editingPost.tiktokCaption} onChange={(event) => updateEditingPost({ tiktokCaption: event.target.value })} placeholder="Подпись и хэштеги для TikTok…" />{formErrors.tiktokCaption && <small className="field-error">{formErrors.tiktokCaption}</small>}</label>
+            {editingPost.channels.includes('TikTok') && <section className="tiktok-controls field--wide" aria-label="Настройки публикации TikTok">
+              <div className="tiktok-account">
+                {tiktokCreator?.avatarUrl ? <img src={tiktokCreator.avatarUrl} alt="" /> : <Music2 />}
+                <div><span>ПУБЛИКАЦИЯ В TIKTOK</span><strong>{tiktokCreatorLoading ? 'Проверяем аккаунт…' : tiktokCreator ? tiktokCreator.nickname : 'Аккаунт не подтверждён'}</strong>{tiktokCreator?.username && <small>@{tiktokCreator.username}</small>}</div>
+              </div>
+              {tiktokCreatorError && <div className="approval-warning"><CircleAlert /><span>{tiktokCreatorError}</span></div>}
+              <label className="field"><span>Кто увидит публикацию</span><select name="tiktokPrivacy" aria-invalid={Boolean(formErrors.tiktokPrivacy)} value={editingPost.tiktokPrivacy} onChange={(event) => updateEditingPost({ tiktokPrivacy: event.target.value as Post['tiktokPrivacy'] })}><option value="">Выберите вручную</option>{(tiktokCreator?.privacyOptions ?? ['SELF_ONLY', 'MUTUAL_FOLLOW_FRIENDS']).filter(Boolean).map((privacy) => <option key={privacy} value={privacy} disabled={privacy === 'SELF_ONLY' && editingPost.tiktokBrandedContent}>{privacyLabels[privacy]}</option>)}</select>{formErrors.tiktokPrivacy && <small className="field-error">{formErrors.tiktokPrivacy}</small>}</label>
+              <fieldset className="tiktok-options"><legend>Разрешить взаимодействия</legend>
+                <label><input type="checkbox" checked={editingPost.tiktokAllowComment} disabled={tiktokCreator?.commentDisabled} onChange={(event) => updateEditingPost({ tiktokAllowComment: event.target.checked })} />Комментарии</label>
+                <label><input type="checkbox" checked={editingPost.tiktokAllowDuet} disabled={tiktokCreator?.duetDisabled} onChange={(event) => updateEditingPost({ tiktokAllowDuet: event.target.checked })} />Duet</label>
+                <label><input type="checkbox" checked={editingPost.tiktokAllowStitch} disabled={tiktokCreator?.stitchDisabled} onChange={(event) => updateEditingPost({ tiktokAllowStitch: event.target.checked })} />Stitch</label>
+                <small>Ничего не включено заранее. Недоступные функции определяются настройками аккаунта TikTok.</small>
+              </fieldset>
+              <fieldset className="tiktok-options"><legend>Коммерческий контент</legend>
+                <label><input type="checkbox" checked={editingPost.tiktokCommercialContent} onChange={(event) => updateEditingPost({ tiktokCommercialContent: event.target.checked, ...(!event.target.checked ? { tiktokYourBrand: false, tiktokBrandedContent: false } : {}) })} />Публикация продвигает бренд, товар или услугу</label>
+                {editingPost.tiktokCommercialContent && <div className="tiktok-disclosure"><label><input type="checkbox" checked={editingPost.tiktokYourBrand} onChange={(event) => updateEditingPost({ tiktokYourBrand: event.target.checked })} />Мой бренд · будет помечено как рекламный контент</label><label><input type="checkbox" checked={editingPost.tiktokBrandedContent} onChange={(event) => updateEditingPost({ tiktokBrandedContent: event.target.checked, ...(event.target.checked && editingPost.tiktokPrivacy === 'SELF_ONLY' ? { tiktokPrivacy: '' } : {}) })} />Платное партнёрство · будет помечено как paid partnership</label></div>}
+                {formErrors.tiktokCommercial && <small className="field-error">{formErrors.tiktokCommercial}</small>}
+              </fieldset>
+              <label className="tiktok-consent"><input type="checkbox" aria-invalid={Boolean(formErrors.tiktokMusicConsent)} checked={editingPost.tiktokMusicConsent} onChange={(event) => updateEditingPost({ tiktokMusicConsent: event.target.checked })} /><span>{editingPost.tiktokBrandedContent ? 'Публикуя, вы соглашаетесь с TikTok Branded Content Policy и Music Usage Confirmation.' : 'Публикуя, вы соглашаетесь с TikTok Music Usage Confirmation.'}</span></label>
+              {formErrors.tiktokMusicConsent && <small className="field-error">{formErrors.tiktokMusicConsent}</small>}
+              <p className="tiktok-processing">После отправки TikTok может обрабатывать и проверять видео несколько минут. Статус появится в очереди.</p>
+            </section>}
             <label className="field"><span>CTA</span><input name="cta" autoComplete="off" value={editingPost.cta} onChange={(event) => updateEditingPost({ cta: event.target.value })} placeholder="Получить аудит…" /></label>
             <label className="field"><span>HTTPS-ссылка</span><input name="destinationUrl" type="url" inputMode="url" autoComplete="off" aria-invalid={Boolean(formErrors.destinationUrl)} value={editingPost.destinationUrl} onChange={(event) => updateEditingPost({ destinationUrl: event.target.value })} placeholder="https://rocket-peak.com/…" />{formErrors.destinationUrl && <small className="field-error">{formErrors.destinationUrl}</small>}</label>
             <section className="media-field field--wide" aria-label="Медиа публикации">

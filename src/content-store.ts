@@ -1,6 +1,6 @@
 export type Channel = 'Facebook' | 'Instagram' | 'TikTok'
 export type Status = 'draft' | 'review' | 'approved' | 'skipped'
-export type TikTokPrivacy = 'SELF_ONLY' | 'MUTUAL_FOLLOW_FRIENDS' | 'PUBLIC_TO_EVERYONE'
+export type TikTokPrivacy = '' | 'SELF_ONLY' | 'FOLLOWER_OF_CREATOR' | 'MUTUAL_FOLLOW_FRIENDS' | 'PUBLIC_TO_EVERYONE'
 
 export type Approval = {
   version: number
@@ -24,6 +24,13 @@ export type Post = {
   instagramCaption: string
   tiktokCaption: string
   tiktokPrivacy: TikTokPrivacy
+  tiktokAllowComment: boolean
+  tiktokAllowDuet: boolean
+  tiktokAllowStitch: boolean
+  tiktokCommercialContent: boolean
+  tiktokYourBrand: boolean
+  tiktokBrandedContent: boolean
+  tiktokMusicConsent: boolean
   cta: string
   destinationUrl: string
   approval: Approval | null
@@ -128,8 +135,15 @@ function parsePost(value: unknown): Post | null {
     facebookCaption: normalizeText(value.facebookCaption),
     instagramCaption: normalizeText(value.instagramCaption),
     tiktokCaption: normalizeText(value.tiktokCaption, normalizeText(value.instagramCaption)),
-    tiktokPrivacy: ['SELF_ONLY', 'MUTUAL_FOLLOW_FRIENDS', 'PUBLIC_TO_EVERYONE'].includes(normalizeText(value.tiktokPrivacy))
-      ? normalizeText(value.tiktokPrivacy) as TikTokPrivacy : 'SELF_ONLY',
+    tiktokPrivacy: ['', 'SELF_ONLY', 'FOLLOWER_OF_CREATOR', 'MUTUAL_FOLLOW_FRIENDS', 'PUBLIC_TO_EVERYONE'].includes(normalizeText(value.tiktokPrivacy))
+      ? normalizeText(value.tiktokPrivacy) as TikTokPrivacy : '',
+    tiktokAllowComment: value.tiktokAllowComment === true,
+    tiktokAllowDuet: value.tiktokAllowDuet === true,
+    tiktokAllowStitch: value.tiktokAllowStitch === true,
+    tiktokCommercialContent: value.tiktokCommercialContent === true,
+    tiktokYourBrand: value.tiktokYourBrand === true,
+    tiktokBrandedContent: value.tiktokBrandedContent === true,
+    tiktokMusicConsent: value.tiktokMusicConsent === true,
     cta: normalizeText(value.cta),
     destinationUrl: normalizeText(value.destinationUrl),
     approval: status === 'approved' && approval?.version === version ? approval : null,
@@ -162,7 +176,9 @@ function migrateLegacyPost(value: unknown): Post | null {
     facebookCaption: hook,
     instagramCaption: hook,
     tiktokCaption: hook,
-    tiktokPrivacy: 'SELF_ONLY',
+    tiktokPrivacy: '',
+    tiktokAllowComment: false, tiktokAllowDuet: false, tiktokAllowStitch: false,
+    tiktokCommercialContent: false, tiktokYourBrand: false, tiktokBrandedContent: false, tiktokMusicConsent: false,
     cta: '',
     destinationUrl: '',
     approval: status === 'approved' ? { version, approvedAt: createdAt } : null,
@@ -189,7 +205,9 @@ export function createDraftPost(): Post {
     facebookCaption: '',
     instagramCaption: '',
     tiktokCaption: '',
-    tiktokPrivacy: 'SELF_ONLY',
+    tiktokPrivacy: '',
+    tiktokAllowComment: false, tiktokAllowDuet: false, tiktokAllowStitch: false,
+    tiktokCommercialContent: false, tiktokYourBrand: false, tiktokBrandedContent: false, tiktokMusicConsent: false,
     cta: '',
     destinationUrl: '',
     approval: null,
@@ -211,7 +229,9 @@ export function createSeedPosts(): Post[] {
   const createdAt = nowIso()
   return rows.map(([scheduledDate, scheduledTime, pillar, title, hook, accountId, channels, status, format]) => ({
     id: createId(), version: 1, scheduledDate, scheduledTime, timezone: 'Asia/Tbilisi', pillar, title, hook, format, accountId,
-    channels: [...channels] as Channel[], status, facebookCaption: hook, instagramCaption: hook, tiktokCaption: hook, tiktokPrivacy: 'SELF_ONLY', cta: '', destinationUrl: '',
+    channels: [...channels] as Channel[], status, facebookCaption: hook, instagramCaption: hook, tiktokCaption: hook, tiktokPrivacy: '',
+    tiktokAllowComment: false, tiktokAllowDuet: false, tiktokAllowStitch: false,
+    tiktokCommercialContent: false, tiktokYourBrand: false, tiktokBrandedContent: false, tiktokMusicConsent: false, cta: '', destinationUrl: '',
     approval: status === 'approved' ? { version: 1, approvedAt: createdAt } : null, createdAt, updatedAt: createdAt,
   }))
 }

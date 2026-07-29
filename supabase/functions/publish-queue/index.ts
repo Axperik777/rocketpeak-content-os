@@ -62,7 +62,7 @@ async function uploadInChunks(uploadUrl: string, bytes: Uint8Array, chunkSize: n
 
 async function publishTikTok(admin: ReturnType<typeof createClient>, job: Record<string, unknown>) {
   const [postResult, mediaResult] = await Promise.all([
-    admin.from('posts').select('tiktok_caption,tiktok_privacy').eq('id', job.post_id).eq('owner_id', job.owner_id).single(),
+    admin.from('posts').select('tiktok_caption,tiktok_privacy,tiktok_allow_comment,tiktok_allow_duet,tiktok_allow_stitch,tiktok_commercial_content,tiktok_your_brand,tiktok_branded_content,tiktok_music_consent').eq('id', job.post_id).eq('owner_id', job.owner_id).single(),
     admin.from('media_assets').select('storage_path,size_bytes').eq('post_id', job.post_id).eq('owner_id', job.owner_id).eq('mime_type', 'video/mp4').eq('validation_status', 'ready').order('created_at').limit(1).single(),
   ])
   if (postResult.error) throw new Error('post_not_found')
@@ -73,6 +73,9 @@ async function publishTikTok(admin: ReturnType<typeof createClient>, job: Record
   const privacy = postResult.data.tiktok_privacy
   if (!creator.ok || creatorData.error?.code !== 'ok') throw new Error(creatorData.error?.code ?? 'tiktok_creator_query_failed')
   if (!creatorData.data?.privacy_level_options?.includes(privacy)) throw new Error('tiktok_privacy_unavailable')
+  if (!postResult.data.tiktok_music_consent) throw new Error('tiktok_music_consent_required')
+  if (postResult.data.tiktok_commercial_content && !postResult.data.tiktok_your_brand && !postResult.data.tiktok_branded_content) throw new Error('tiktok_commercial_selection_required')
+  if (postResult.data.tiktok_branded_content && privacy === 'SELF_ONLY') throw new Error('tiktok_branded_content_cannot_be_private')
 
   const signed = await admin.storage.from('content-media').createSignedUrl(mediaResult.data.storage_path, 600)
   if (signed.error) throw new Error('media_sign_failed')
@@ -81,7 +84,7 @@ async function publishTikTok(admin: ReturnType<typeof createClient>, job: Record
   const bytes = new Uint8Array(await mediaResponse.arrayBuffer())
   const chunkCount = Math.max(1, Math.ceil(bytes.byteLength / (64 * 1024 * 1024)))
   const chunkSize = Math.floor(bytes.byteLength / chunkCount)
-  const initialized = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json; charset=UTF-8' }, body: JSON.stringify({ post_info: { title: String(postResult.data.tiktok_caption).slice(0, 2200), privacy_level: privacy, disable_duet: false, disable_comment: false, disable_stitch: false }, source_info: { source: 'FILE_UPLOAD', video_size: bytes.byteLength, chunk_size: chunkSize, total_chunk_count: Math.floor(bytes.byteLength / chunkSize) } }) })
+  const initialized = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json; charset=UTF-8' }, body: JSON.stringify({ post_info: { title: String(postResult.data.tiktok_caption).slice(0, 2200), privacy_level: privacy, disable_duet: creatorData.data.duet_disabled === true || !postResult.data.tiktok_allow_duet, disable_comment: creatorData.data.comment_disabled === true || !postResult.data.tiktok_allow_comment, disable_stitch: creatorData.data.stitch_disabled === true || !postResult.data.tiktok_allow_stitch, brand_content_toggle: postResult.data.tiktok_branded_content === true, brand_organic_toggle: postResult.data.tiktok_your_brand === true }, source_info: { source: 'FILE_UPLOAD', video_size: bytes.byteLength, chunk_size: chunkSize, total_chunk_count: Math.floor(bytes.byteLength / chunkSize) } }) })
   const initData = await initialized.json()
   if (!initialized.ok || initData.error?.code !== 'ok') throw new Error([initData.error?.code ?? 'tiktok_init_failed', initData.error?.message].filter(Boolean).join(': '))
   await uploadInChunks(initData.data.upload_url, bytes, chunkSize)
