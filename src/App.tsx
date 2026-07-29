@@ -410,9 +410,18 @@ function App() {
   const uploadMedia = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
-    if (!file || !session || !editingPost || isNewDraft.current) return
+    if (!file || !session || !editingPost) return
     setMediaBusy(true)
     try {
+      if (isNewDraft.current) {
+        const draft = { ...editingPost, status: 'draft' as const, approval: null, updatedAt: new Date().toISOString() }
+        await saveRemotePosts(session.user.id, [draft, ...posts])
+        setPosts((current) => current.some((post) => post.id === draft.id) ? current : [draft, ...current])
+        setSelectedPostId(draft.id)
+        setEditingPost(draft)
+        editingOriginal.current = { ...draft, channels: [...draft.channels] }
+        isNewDraft.current = false
+      }
       const asset = await uploadMediaAsset(session.user.id, editingPost.id, file)
       setMediaAssets((current) => [...current, asset])
       showNotice('Медиа загружено в приватное хранилище.')
@@ -543,7 +552,7 @@ function App() {
             <label className="field"><span>HTTPS-ссылка</span><input name="destinationUrl" type="url" inputMode="url" autoComplete="off" aria-invalid={Boolean(formErrors.destinationUrl)} value={editingPost.destinationUrl} onChange={(event) => updateEditingPost({ destinationUrl: event.target.value })} placeholder="https://rocket-peak.com/…" />{formErrors.destinationUrl && <small className="field-error">{formErrors.destinationUrl}</small>}</label>
             <section className="media-field field--wide" aria-label="Медиа публикации">
               <div><span>МЕДИА</span><small>JPG, PNG, WebP до 10 МБ · MP4, MOV до 100 МБ</small></div>
-              {isNewDraft.current ? <p>Сначала сохраните новый материал, затем откройте его и загрузите файл.</p> : <label className={`media-upload ${mediaBusy ? 'is-busy' : ''}`}><Upload />{mediaBusy ? 'Загрузка…' : 'Загрузить файл'}<input type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" onChange={uploadMedia} disabled={mediaBusy} /></label>}
+              <label className={`media-upload ${mediaBusy ? 'is-busy' : ''}`}><Upload />{mediaBusy ? 'Загрузка…' : isNewDraft.current ? 'Выбрать файл и сохранить черновик' : 'Загрузить файл'}<input type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" onChange={uploadMedia} disabled={mediaBusy} /></label>
               {editingMedia.length > 0 && <div className="media-list">{editingMedia.map((asset) => <article key={asset.id}>{asset.mimeType.startsWith('image/') ? <img src={asset.signedUrl} alt="Прикреплённый креатив" /> : <video src={asset.signedUrl} preload="metadata" />}<div><strong>{asset.mimeType.startsWith('image/') ? 'Изображение' : 'Видео'}</strong><span>{asset.width}×{asset.height} · {(asset.sizeBytes / 1024 / 1024).toFixed(1)} МБ{asset.durationSeconds ? ` · ${asset.durationSeconds.toFixed(1)} сек` : ''}</span><em>{asset.validationStatus === 'ready' ? 'Серверная проверка пройдена' : asset.validationStatus === 'failed' ? 'Файл отклонён' : 'Ожидает серверной проверки'}</em></div><button type="button" onClick={() => removeMedia(asset)} disabled={mediaBusy} aria-label="Удалить медиа"><Trash2 /></button></article>)}</div>}
             </section>
             {editingOriginal.current?.status === 'approved' && <div className="approval-warning field--wide"><CircleAlert /><span>После сохранения версия увеличится, а прежнее согласование будет аннулировано.</span></div>}
