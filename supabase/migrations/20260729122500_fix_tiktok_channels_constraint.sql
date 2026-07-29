@@ -6,3 +6,4 @@ alter table public.posts add constraint posts_channels_check
 
 grant select, update on table public.media_assets to service_role;
 grant select on table storage.objects to service_role;
+grant select on table public.posts to service_role;

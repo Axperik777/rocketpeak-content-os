@@ -79,10 +79,11 @@ async function publishTikTok(admin: ReturnType<typeof createClient>, job: Record
   const mediaResponse = await fetch(signed.data.signedUrl)
   if (!mediaResponse.ok) throw new Error('media_download_failed')
   const bytes = new Uint8Array(await mediaResponse.arrayBuffer())
-  const chunkSize = Math.min(bytes.byteLength, 10 * 1024 * 1024)
-  const initialized = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json; charset=UTF-8' }, body: JSON.stringify({ post_info: { title: String(postResult.data.tiktok_caption).slice(0, 2200), privacy_level: privacy, disable_duet: false, disable_comment: false, disable_stitch: false }, source_info: { source: 'FILE_UPLOAD', video_size: bytes.byteLength, chunk_size: chunkSize, total_chunk_count: Math.ceil(bytes.byteLength / chunkSize) } }) })
+  const chunkCount = Math.max(1, Math.ceil(bytes.byteLength / (64 * 1024 * 1024)))
+  const chunkSize = Math.floor(bytes.byteLength / chunkCount)
+  const initialized = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json; charset=UTF-8' }, body: JSON.stringify({ post_info: { title: String(postResult.data.tiktok_caption).slice(0, 2200), privacy_level: privacy, disable_duet: false, disable_comment: false, disable_stitch: false }, source_info: { source: 'FILE_UPLOAD', video_size: bytes.byteLength, chunk_size: chunkSize, total_chunk_count: Math.floor(bytes.byteLength / chunkSize) } }) })
   const initData = await initialized.json()
-  if (!initialized.ok || initData.error?.code !== 'ok') throw new Error(initData.error?.code ?? 'tiktok_init_failed')
+  if (!initialized.ok || initData.error?.code !== 'ok') throw new Error([initData.error?.code ?? 'tiktok_init_failed', initData.error?.message].filter(Boolean).join(': '))
   await uploadInChunks(initData.data.upload_url, bytes, chunkSize)
   return initData.data.publish_id as string
 }
