@@ -224,7 +224,7 @@ function App() {
         const byId = new Map(validated.map((asset) => [asset.id, asset]))
         setMediaAssets((current) => current.map((asset) => byId.get(asset.id) ?? asset))
       })
-      .catch((error) => showNotice(errorMessage(error, 'Не удалось повторить серверную проверку медиа.'))
+      .catch((error) => showNotice(errorMessage(error, 'Не удалось повторить серверную проверку медиа.')))
   }, [mediaAssets, remoteReady, session?.user.id])
 
   const hasUnsavedChanges = useMemo(() => editingPost !== null && JSON.stringify(editingPost) !== JSON.stringify(editingOriginal.current), [editingPost])
