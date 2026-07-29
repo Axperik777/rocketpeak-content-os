@@ -107,6 +107,7 @@ function App() {
   const [authReady, setAuthReady] = useState(false)
   const [remoteReady, setRemoteReady] = useState(false)
   const [syncState, setSyncState] = useState<'local' | 'syncing' | 'synced' | 'error'>('local')
+  const [syncError, setSyncError] = useState('')
   const [view, setView] = useState<View>(getInitialView)
   const [filter, setFilter] = useState<Filter>('all')
   const [posts, setPosts] = useState<Post[]>(initialPlan.posts)
@@ -157,10 +158,14 @@ function App() {
         if (!cancelled) {
           setRemoteReady(true)
           setSyncState('synced')
+          setSyncError('')
         }
       })
-      .catch(() => {
-        if (!cancelled) setSyncState('error')
+      .catch((error) => {
+        if (!cancelled) {
+          setSyncState('error')
+          setSyncError(error instanceof Error ? error.message : 'Не удалось загрузить данные из Supabase')
+        }
       })
     return () => { cancelled = true }
   }, [session?.user.id])
@@ -170,8 +175,14 @@ function App() {
     setSyncState('syncing')
     const timer = window.setTimeout(() => {
       saveRemotePosts(session.user.id, posts)
-        .then(() => setSyncState('synced'))
-        .catch(() => setSyncState('error'))
+        .then(() => {
+          setSyncState('synced')
+          setSyncError('')
+        })
+        .catch((error) => {
+          setSyncState('error')
+          setSyncError(error instanceof Error ? error.message : 'Не удалось сохранить данные в Supabase')
+        })
     }, 500)
     return () => window.clearTimeout(timer)
   }, [posts, remoteReady, session?.user.id])
@@ -267,15 +278,47 @@ function App() {
     window.location.assign(data.authorizationUrl)
   }
 
-  const changeStatus = (id: string, status: Status) => {
+  const changeStatus = async (id: string, status: Status) => {
+    const currentPost = posts.find((post) => post.id === id)
+    if (!currentPost) return
+    if (status === 'approved' && currentPost.channels.includes('TikTok')) {
+      const tiktokMedia = mediaAssets.find((asset) => asset.postId === id && asset.mimeType === 'video/mp4')
+      if (!tiktokMedia) {
+        showNotice('Для TikTok нужно прикрепить видео MP4.')
+        return
+      }
+      if (tiktokMedia.validationStatus !== 'ready') {
+        showNotice(tiktokMedia.validationStatus === 'failed' ? 'Видео не прошло серверную проверку.' : 'Дождитесь завершения серверной проверки видео.')
+        return
+      }
+    }
     const changedAt = new Date().toISOString()
-    setPosts((current) => current.map((post) => post.id === id ? {
+    const updatedPosts = posts.map((post) => post.id === id ? {
       ...post,
       status,
       updatedAt: changedAt,
       approval: status === 'approved' ? { version: post.version, approvedAt: changedAt } : null,
-    } : post))
-    showNotice(status === 'approved' ? 'Согласовано. Автопубликация остаётся выключенной.' : 'Статус обновлён локально.')
+    } : post)
+    setPosts(updatedPosts)
+
+    if (status === 'approved' && supabase && session) {
+      const approvedPost = updatedPosts.find((post) => post.id === id)
+      if (!approvedPost) return
+      try {
+        await saveRemotePosts(session.user.id, updatedPosts)
+        for (const channel of approvedPost.channels) {
+          const queued = await supabase.rpc('enqueue_publication', { p_post_id: approvedPost.id, p_channel: channel })
+          if (queued.error) throw queued.error
+        }
+        showNotice('Согласовано. Задача публикации добавлена в серверную очередь.')
+      } catch (error) {
+        setPosts(posts)
+        showNotice(error instanceof Error ? error.message : 'Не удалось поставить публикацию в очередь.')
+      }
+      return
+    }
+
+    showNotice('Статус обновлён.')
   }
 
   const createDraft = () => {
@@ -464,7 +507,7 @@ function App() {
           })}
         </nav>
         <div className="safety-card"><ShieldCheck /><div><strong>Безопасный режим</strong><span>Публикация только после подтверждения</span></div></div>
-        <div className={`sidebar-foot sync-${syncState}`}><span className="live-dot" />{syncState === 'synced' ? 'Синхронизировано' : syncState === 'syncing' ? 'Синхронизация…' : syncState === 'error' ? 'Ошибка синхронизации' : 'Локальный режим'}</div>
+        <div className={`sidebar-foot sync-${syncState}`} title={syncError}><span className="live-dot" />{syncState === 'synced' ? 'Синхронизировано' : syncState === 'syncing' ? 'Синхронизация…' : syncState === 'error' ? `Ошибка синхронизации${syncError ? `: ${syncError}` : ''}` : 'Локальный режим'}</div>
       </aside>
 
       <main id="workspace">
