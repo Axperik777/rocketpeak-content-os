@@ -13,9 +13,11 @@ alter table public.posts drop constraint if exists posts_tiktok_privacy_check;
 alter table public.posts add constraint posts_tiktok_privacy_check
   check (tiktok_privacy in ('', 'SELF_ONLY', 'FOLLOWER_OF_CREATOR', 'MUTUAL_FOLLOW_FRIENDS', 'PUBLIC_TO_EVERYONE'));
 
+alter table public.posts drop constraint if exists posts_tiktok_commercial_selection_check;
 alter table public.posts add constraint posts_tiktok_commercial_selection_check
   check (not tiktok_commercial_content or tiktok_your_brand or tiktok_branded_content);
 
+alter table public.posts drop constraint if exists posts_tiktok_branded_privacy_check;
 alter table public.posts add constraint posts_tiktok_branded_privacy_check
   check (not tiktok_branded_content or tiktok_privacy <> 'SELF_ONLY');
 
