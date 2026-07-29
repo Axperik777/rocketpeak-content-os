@@ -30,7 +30,7 @@ import {
 import { createDraftPost, createPlan, getScheduleError, loadPlan, parsePlan, savePlan, type Channel, type Post, type Status } from './content-store'
 import { AuthScreen } from './AuthScreen'
 import { loadRemotePosts, prepareUser, saveRemotePosts } from './remote-store'
-import { deleteMediaAsset, loadMediaAssets, uploadMediaAsset, type MediaAsset } from './media-store'
+import { deleteMediaAsset, loadMediaAssets, revalidateMediaAsset, uploadMediaAsset, type MediaAsset } from './media-store'
 import { supabase } from './supabase'
 
 type View = 'queue' | 'calendar' | 'accounts' | 'settings'
@@ -126,6 +126,7 @@ function App() {
   const [mediaBusy, setMediaBusy] = useState(false)
   const [tiktokStatus, setTiktokStatus] = useState('disconnected')
   const noticeTimer = useRef<number | undefined>(undefined)
+  const validationAttempts = useRef(new Set<string>())
   const editingOriginal = useRef<Post | null>(null)
   const isNewDraft = useRef(false)
   const importInput = useRef<HTMLInputElement | null>(null)
@@ -212,6 +213,19 @@ function App() {
       if (status) setTiktokStatus(status)
     })
   }, [remoteReady, session?.user.id])
+
+  useEffect(() => {
+    if (!session || !remoteReady) return
+    const pending = mediaAssets.filter((asset) => asset.validationStatus === 'client_checked' && !validationAttempts.current.has(asset.id))
+    if (!pending.length) return
+    pending.forEach((asset) => validationAttempts.current.add(asset.id))
+    Promise.all(pending.map(revalidateMediaAsset))
+      .then((validated) => {
+        const byId = new Map(validated.map((asset) => [asset.id, asset]))
+        setMediaAssets((current) => current.map((asset) => byId.get(asset.id) ?? asset))
+      })
+      .catch((error) => showNotice(errorMessage(error, 'Не удалось повторить серверную проверку медиа.'))
+  }, [mediaAssets, remoteReady, session?.user.id])
 
   const hasUnsavedChanges = useMemo(() => editingPost !== null && JSON.stringify(editingPost) !== JSON.stringify(editingOriginal.current), [editingPost])
 
