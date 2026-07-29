@@ -477,7 +477,7 @@ function App() {
 
         {view === 'queue' && <>
           <section className="control-strip" aria-label="Текущий статус">
-            <div className="next-action"><span className="step-index">СЕЙЧАС</span><div><strong>{stats.review ? 'Проверьте материал перед публикацией' : 'Очередь согласована'}</strong><p>{stats.review ? 'Решение займёт меньше минуты. Без него публикации не будет.' : 'Можно переходить к подготовке следующей недели.'}</p></div><button onClick={() => setFilter('review')} disabled={!stats.review}>Показать <ChevronRight /></button></div>
+            <div className="next-action"><span className="step-index">СЕЙЧАС</span><div><strong>{stats.review ? 'Проверьте материал перед публикацией' : stats.draft ? 'Подготовьте черновики' : 'Очередь согласована'}</strong><p>{stats.review ? 'Решение займёт меньше минуты. Без него публикации не будет.' : stats.draft ? 'Откройте следующий материал и отправьте его на проверку.' : 'Можно переходить к подготовке следующей недели.'}</p></div><button onClick={() => setFilter(stats.review ? 'review' : stats.draft ? 'draft' : 'all')}>{stats.review ? 'Показать' : stats.draft ? 'Показать черновики' : 'Показать все'} <ChevronRight /></button></div>
             <div className="metric"><span>Черновики</span><b>{stats.draft}</b><small>требуют подготовки</small></div>
             <div className="metric metric--signal"><span>Нужно решение</span><b>{stats.review}</b><small>приоритет сейчас</small></div>
             <div className="metric metric--ready"><span>Готово</span><b>{stats.approved}</b><small>подтверждено</small></div>
