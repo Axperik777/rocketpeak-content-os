@@ -17,6 +17,9 @@ import {
   Camera,
   Music2,
   LayoutList,
+  House,
+  FolderKanban,
+  Images,
   LockKeyhole,
   Pencil,
   PlugZap,
@@ -34,8 +37,13 @@ import { loadPublicationJobs, loadRemotePosts, prepareUser, saveRemotePosts, typ
 import { deleteMediaAsset, loadMediaAssets, revalidateMediaAsset, uploadMediaAsset, type MediaAsset } from './media-store'
 import { supabase } from './supabase'
 import { AIStudio, type GeneratedDraft } from './AIStudio'
+import { WorkspaceHome } from './WorkspaceHome'
+import { ProjectsView } from './ProjectsView'
+import { CreativeLab } from './CreativeLab'
+import { LibraryView } from './LibraryView'
+import { WorkspaceAccess } from './WorkspaceAccess'
 
-type View = 'queue' | 'studio' | 'calendar' | 'accounts' | 'settings'
+type View = 'home' | 'projects' | 'creative' | 'queue' | 'studio' | 'calendar' | 'library' | 'accounts' | 'settings'
 type Filter = 'all' | 'review' | 'draft' | 'ready' | 'skipped'
 type TikTokCreatorInfo = {
   nickname: string
@@ -68,15 +76,21 @@ const accounts: Account[] = [
 ]
 
 const viewMeta: Record<View, { label: string; title: string; description: string; icon: LucideIcon }> = {
-  queue: { label: 'Очередь', title: 'Рабочая очередь', description: 'Проверьте материал и примите одно решение.', icon: LayoutList },
+  home: { label: 'Главная', title: 'Рабочее пространство', description: 'Клиентские креативы и собственный контент в двух безопасных контурах.', icon: House },
+  projects: { label: 'Проекты', title: 'Клиентские проекты', description: 'Постоянный контекст для текстов, креативов и референсов.', icon: FolderKanban },
+  creative: { label: 'Создать', title: 'Креативная лаборатория', description: 'Гипотеза, референс и готовые варианты внутри проекта.', icon: Images },
+  queue: { label: 'Контент', title: 'Контент RocketPeak', description: 'Проверьте материал и примите одно решение.', icon: LayoutList },
   studio: { label: 'AI-студия', title: 'Контент-лаборатория', description: 'Три готовых материала из одного точного брифа.', icon: BrainCircuit },
   calendar: { label: 'Календарь', title: 'План публикаций', description: 'Неделя без конфликтов и случайных выходов.', icon: CalendarDays },
+  library: { label: 'Библиотека', title: 'Библиотека файлов', description: 'Исходники, референсы и версии по проектам.', icon: Images },
   accounts: { label: 'Аккаунты', title: 'Карта Meta-активов', description: 'Кто есть кто и что разрешено подключать.', icon: UsersRound },
   settings: { label: 'Подключения', title: 'Безопасные подключения', description: 'Только официальные API и ручное подтверждение.', icon: PlugZap },
 }
 
+const primaryViews: View[] = ['home', 'projects', 'creative', 'queue', 'library', 'settings']
+
 const statusLabels: Record<Status, string> = { draft: 'Черновик', review: 'Нужно решение', approved: 'Согласовано', skipped: 'Пропущено' }
-const validViews: View[] = ['queue', 'studio', 'calendar', 'accounts', 'settings']
+const validViews: View[] = ['home', 'projects', 'creative', 'queue', 'studio', 'calendar', 'library', 'accounts', 'settings']
 const initialPlan = loadPlan()
 const privacyLabels: Record<Post['tiktokPrivacy'], string> = {
   '': 'Выберите видимость',
@@ -88,7 +102,7 @@ const privacyLabels: Record<Post['tiktokPrivacy'], string> = {
 
 function getInitialView(): View {
   const hash = window.location.hash.slice(1) as View
-  return validViews.includes(hash) ? hash : 'queue'
+  return validViews.includes(hash) ? hash : 'home'
 }
 
 function Mark() {
@@ -135,6 +149,7 @@ function App() {
   const [syncState, setSyncState] = useState<'local' | 'syncing' | 'synced' | 'error'>('local')
   const [syncError, setSyncError] = useState('')
   const [view, setView] = useState<View>(getInitialView)
+  const [creativeProjectId, setCreativeProjectId] = useState<string>()
   const [filter, setFilter] = useState<Filter>('all')
   const [posts, setPosts] = useState<Post[]>(initialPlan.posts)
   const [notice, setNotice] = useState(initialPlan.message ?? '')
@@ -633,9 +648,10 @@ function App() {
       <aside className="sidebar">
         <div className="brand"><Mark /><div><strong>CONTENT OS</strong><span>RocketPeak workspace</span></div></div>
         <nav aria-label="Основная навигация">
-          {(Object.keys(viewMeta) as View[]).map((id) => {
+          {primaryViews.map((id) => {
             const ItemIcon = viewMeta[id].icon
-            return <a href={`#${id}`} aria-current={view === id ? 'page' : undefined} className={view === id ? 'active' : ''} onClick={() => setView(id)} key={id}><ItemIcon /><span>{viewMeta[id].label}</span>{id === 'queue' && stats.review > 0 && <b>{stats.review}</b>}</a>
+            const contentActive = id === 'queue' && ['queue', 'studio', 'calendar', 'accounts'].includes(view)
+            return <a href={`#${id}`} aria-current={(view === id || contentActive) ? 'page' : undefined} className={(view === id || contentActive) ? 'active' : ''} onClick={() => setView(id)} key={id}><ItemIcon /><span>{viewMeta[id].label}</span>{id === 'queue' && stats.review > 0 && <b>{stats.review}</b>}</a>
           })}
         </nav>
         <div className="safety-card"><ShieldCheck /><div><strong>Безопасный режим</strong><span>Публикация только после подтверждения</span></div></div>
@@ -645,10 +661,17 @@ function App() {
       <main id="workspace">
         <header className="topbar">
           <div className="page-title"><span className="eyebrow">ROCKETPEAK · {todayLabel.toUpperCase()} · ТБИЛИСИ</span><h1>{activeMeta.title}</h1><p>{activeMeta.description}</p></div>
-          <div className="top-actions"><input ref={importInput} className="visually-hidden" type="file" accept="application/json,.json" onChange={importPlan} /><button className="button secondary" onClick={() => importInput.current?.click()}><Upload />Импорт</button><button className="button secondary" onClick={exportPlan}><Download />Экспорт</button><button className="button secondary" onClick={() => supabase?.auth.signOut()}>Выйти</button><button className="button primary" onClick={createDraft}><Plus />Новый материал</button></div>
+          <div className="top-actions"><input ref={importInput} className="visually-hidden" type="file" accept="application/json,.json" onChange={importPlan} />{['queue','studio','calendar','accounts'].includes(view) && <><button className="button secondary" onClick={() => importInput.current?.click()}><Upload />Импорт</button><button className="button secondary" onClick={exportPlan}><Download />Экспорт</button></>}<button className="button secondary" onClick={() => supabase?.auth.signOut()}>Выйти</button>{['queue','studio','calendar','accounts'].includes(view) ? <button className="button primary" onClick={createDraft}><Plus />Новый материал</button> : <button className="button primary" onClick={() => openView('creative')}><Plus />Создать креатив</button>}</div>
         </header>
 
         {notice && <div className="toast" role="status"><CheckCircle2 />{notice}</div>}
+
+        {view === 'home' && <WorkspaceHome open={openView} />}
+        {view === 'projects' && <ProjectsView onOpenCreative={(projectId) => { setCreativeProjectId(projectId); openView('creative') }} />}
+        {view === 'creative' && <CreativeLab initialProjectId={creativeProjectId} />}
+        {view === 'library' && <LibraryView />}
+
+        {['queue','studio','calendar','accounts'].includes(view) && <nav className="content-tabs" aria-label="Разделы контента"><button className={view === 'queue' ? 'active' : ''} onClick={() => openView('queue')}>Очередь</button><button className={view === 'studio' ? 'active' : ''} onClick={() => openView('studio')}>AI-студия</button><button className={view === 'calendar' ? 'active' : ''} onClick={() => openView('calendar')}>Календарь</button><button className={view === 'accounts' ? 'active' : ''} onClick={() => openView('accounts')}>Аккаунты</button></nav>}
 
         {view === 'queue' && <>
           <section className="control-strip" aria-label="Текущий статус">
@@ -692,6 +715,7 @@ function App() {
         </section>}
 
         {view === 'settings' && <section className="settings-view">
+          <WorkspaceAccess />
           <div className="risk-banner"><ShieldCheck /><div><strong>Контур с низким риском</strong><p>Не обещает отсутствие проверок Meta, но исключает опасные сценарии: cookies, автоклики, действия от личного профиля и массовую активность.</p></div><span>SAFE MODE</span></div>
           {[
             { icon: PlugZap, step: '01', title: 'Meta Graph API', text: 'Официальное подключение Facebook Pages и профессионального Instagram.', state: 'Ждёт проверки активов' },

@@ -1,0 +1,5 @@
+import { ArrowRight, FolderKanban, Images, RadioTower } from 'lucide-react'
+
+export function WorkspaceHome({ open }: { open: (view: 'projects' | 'creative' | 'queue') => void }) {
+  return <section className="workspace-home"><div className="home-command"><span className="eyebrow">РАБОЧИЙ КОНТУР</span><h2>От задачи до готового файла.<br/>Без лишней операционки.</h2><p>Клиентские креативы изолированы от публикации. Контент RocketPeak проходит отдельное ручное согласование.</p></div><div className="home-routes"><button onClick={() => open('projects')}><FolderKanban /><span>01</span><strong>Открыть проекты</strong><p>Контекст клиентов и текущие направления.</p><ArrowRight /></button><button onClick={() => open('creative')}><Images /><span>02</span><strong>Создать креатив</strong><p>Текст, формат, референс и версии.</p><ArrowRight /></button><button onClick={() => open('queue')}><RadioTower /><span>03</span><strong>Контент RocketPeak</strong><p>Очередь, согласование и публикация.</p><ArrowRight /></button></div></section>
+}
