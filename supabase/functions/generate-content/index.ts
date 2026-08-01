@@ -63,7 +63,14 @@ Deno.serve(async (request) => {
     }),
   })
   const result = await response.json()
-  if (!response.ok) return json({ error: 'generation_failed', requestId: response.headers.get('x-request-id') }, response.status >= 500 ? 502 : 400)
+  if (!response.ok) {
+    const upstreamError = typeof result?.error === 'object' && result.error !== null ? result.error : {}
+    return json({
+      error: 'generation_failed',
+      upstreamCode: text(upstreamError.code ?? upstreamError.type, 120) || 'unknown',
+      requestId: response.headers.get('x-request-id'),
+    }, response.status >= 500 ? 502 : 400)
+  }
   const output = result.output_text ?? result.output?.flatMap((item: Record<string, unknown>) => Array.isArray(item.content) ? item.content : []).find((item: Record<string, unknown>) => item.type === 'output_text')?.text
   if (typeof output !== 'string') return json({ error: 'invalid_model_output' }, 502)
   try {

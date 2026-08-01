@@ -51,11 +51,23 @@ export function AIStudio({ onAddDrafts }: { onAddDrafts: (drafts: GeneratedDraft
     setState('generating')
     setError('')
     const { data, error: invokeError } = await supabase.functions.invoke('generate-content', { body: { brief, count: 3 } })
+    let failure = data
+    if (invokeError && !failure && 'context' in invokeError && invokeError.context instanceof Response) {
+      failure = await invokeError.context.json().catch(() => null)
+    }
     if (invokeError || !Array.isArray(data?.drafts) || data.drafts.length !== 3) {
-      setError(data?.error === 'openai_not_configured'
+      setError(failure?.error === 'openai_not_configured'
         ? 'AI подготовлен, но серверный ключ OpenAI ещё не добавлен.'
-        : data?.error === 'daily_limit_reached'
+        : failure?.error === 'daily_limit_reached'
           ? 'Дневной лимит генераций исчерпан. Это защищает бюджет и аккаунт от всплесков.'
+          : failure?.upstreamCode === 'insufficient_quota'
+            ? 'На API OpenAI не подключён баланс. Добавьте способ оплаты и лимит расходов в Platform OpenAI.'
+            : failure?.upstreamCode === 'model_not_found'
+              ? 'Выбранная модель OpenAI недоступна этому проекту. Нужно сменить модель или доступ проекта.'
+              : failure?.upstreamCode === 'invalid_api_key'
+                ? 'Серверный ключ OpenAI недействителен. Создайте новый ключ для текущего проекта.'
+                : failure?.upstreamCode && failure.upstreamCode !== 'unknown'
+                  ? `OpenAI отклонил запрос: ${failure.upstreamCode}. Черновики не изменены.`
           : 'Генерация не завершена. Черновики и очередь публикаций не изменены.')
       setState('error')
       return
