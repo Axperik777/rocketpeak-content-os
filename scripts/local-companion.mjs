@@ -7,16 +7,16 @@ import { fileURLToPath } from 'node:url'
 export const PORT = 43121
 export const PROJECTS_ROOT = process.env.ROCKETPEAK_PROJECTS_ROOT || 'C:\\Users\\Mylaptop\\Desktop\\MARKETING\\Проекты'
 export const PROJECT_FOLDERS = [
-  '00 Бриф',
-  '01 Лендинг\\Исходники',
-  '01 Лендинг\\Готовое',
-  '02 Креативы\\Референсы',
-  '02 Креативы\\Сгенерированные',
-  '02 Креативы\\Одобренные',
-  '03 Тексты объявлений\\Meta',
-  '03 Тексты объявлений\\TikTok',
-  '03 Тексты объявлений\\Google',
-  '04 Экспорт',
+  ['00 Бриф'],
+  ['01 Лендинг', 'Исходники'],
+  ['01 Лендинг', 'Готовое'],
+  ['02 Креативы', 'Референсы'],
+  ['02 Креативы', 'Сгенерированные'],
+  ['02 Креативы', 'Одобренные'],
+  ['03 Тексты объявлений', 'Meta'],
+  ['03 Тексты объявлений', 'TikTok'],
+  ['03 Тексты объявлений', 'Google'],
+  ['04 Экспорт'],
 ]
 
 const allowedOrigins = new Set([
@@ -45,7 +45,7 @@ export async function ensureProjectStructure(project) {
   const projectPath = path.join(PROJECTS_ROOT, name)
   if (!insideRoot(projectPath)) throw new Error('path_outside_projects_root')
   await fs.mkdir(projectPath, { recursive: true })
-  await Promise.all(PROJECT_FOLDERS.map((folder) => fs.mkdir(path.join(projectPath, folder), { recursive: true })))
+  await Promise.all(PROJECT_FOLDERS.map((segments) => fs.mkdir(path.join(projectPath, ...segments), { recursive: true })))
   const brief = {
     projectId: project.id ?? null,
     name,
