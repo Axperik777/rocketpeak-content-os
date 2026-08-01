@@ -2,6 +2,7 @@ import http from 'node:http'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
+import { fileURLToPath } from 'node:url'
 
 export const PORT = 43121
 export const PROJECTS_ROOT = process.env.ROCKETPEAK_PROJECTS_ROOT || 'C:\\Users\\Mylaptop\\Desktop\\MARKETING\\Проекты'
@@ -104,7 +105,7 @@ export function createCompanionServer() {
   })
 }
 
-if (import.meta.url === `file:///${process.argv[1]?.replace(/\\/g, '/')}`) {
+if (process.argv[1] && path.resolve(fileURLToPath(import.meta.url)) === path.resolve(process.argv[1])) {
   await fs.mkdir(PROJECTS_ROOT, { recursive: true })
   createCompanionServer().listen(PORT, '127.0.0.1', () => console.log(`RocketPeak local companion: http://127.0.0.1:${PORT}`))
 }
