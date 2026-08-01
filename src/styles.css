@@ -421,6 +421,10 @@ main { min-width: 0; padding: 32px clamp(24px, 3.2vw, 56px) 56px; overflow: hidd
 
 /* Premium workspace shell: calm, precise and project-first. */
 :root {
+  --bg: #080b10;
+  --panel: #11161e;
+  --panel-2: #171d27;
+  --muted: #8f9baa;
   --canvas: #080b10;
   --sidebar: #07090d;
   --surface: #11161e;
@@ -472,6 +476,18 @@ main { padding: 28px clamp(26px, 3.4vw, 58px) 48px; }
 .button.secondary { background: rgba(255,255,255,.04); border-color: var(--line-bright); }
 .button.secondary:hover { background: rgba(255,255,255,.075); }
 .panel, .project-tile, .brief-main, .lab-workspace, .lab-rail, .project-next, .project-facts { box-shadow: 0 1px 0 rgba(255,255,255,.025) inset; }
+
+.workspace-modal { z-index: 100; padding: 28px; background: rgba(2, 4, 8, .82); backdrop-filter: blur(18px) saturate(110%); }
+.project-form { width: min(860px, 100%); max-height: min(900px, calc(100dvh - 56px)); padding: 0 28px 28px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; border-color: rgba(255,255,255,.14); border-radius: 26px; background: #0e131a; box-shadow: 0 34px 100px rgba(0,0,0,.65), 0 1px 0 rgba(255,255,255,.06) inset; }
+.project-form-head { position: sticky; z-index: 3; top: 0; margin: 0 -28px 22px; padding: 26px 28px 18px; background: linear-gradient(180deg, #0e131a 82%, rgba(14,19,26,.92)); }
+.project-form-head h2 { font-size: 30px; letter-spacing: -.035em; }
+.project-form-head button { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--line-bright); border-radius: 13px; background: rgba(255,255,255,.035); }
+.project-form label { gap: 8px; color: var(--text-2); font-size: 12px; }
+.project-form input, .project-form textarea { border-color: rgba(255,255,255,.12); border-radius: 12px; color: var(--text); background: #080c12; }
+.project-form input:focus, .project-form textarea:focus { outline: 0; border-color: rgba(255,114,72,.8); box-shadow: 0 0 0 4px rgba(255,114,72,.11); }
+.project-form textarea { min-height: 104px; }
+.project-form-actions { position: sticky; z-index: 3; bottom: -28px; margin: 24px -28px -28px; padding: 16px 28px 24px; background: linear-gradient(0deg, #0e131a 82%, rgba(14,19,26,.92)); }
+.project-form-note { padding: 14px 16px; border: 1px solid rgba(255,255,255,.08); border-radius: 13px; background: rgba(255,255,255,.025); line-height: 1.5; }
 
 .workspace-home--premium { width: min(1120px, 100%); margin: 0 auto; padding: clamp(20px, 4vh, 54px) 0 24px; }
 .home-welcome { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 36px; align-items: end; padding: 18px 2px 36px; }
@@ -528,6 +544,11 @@ main { padding: 28px clamp(26px, 3.4vw, 58px) 48px; }
   .home-welcome > div > p { font-size: 15px; }
   .workspace-choice { min-height: 350px; padding: 22px; border-radius: 22px; }
   .home-principle { grid-template-columns: 1fr; gap: 8px; }
+  .workspace-modal { padding: 0; place-items: end center; }
+  .project-form { width: 100%; height: 94dvh; max-height: 94dvh; padding: 0 20px 20px; border-radius: 24px 24px 0 0; }
+  .project-form-head { margin: 0 -20px 20px; padding: 22px 20px 14px; }
+  .project-form-grid { grid-template-columns: 1fr; }
+  .project-form-actions { bottom: -20px; margin: 22px -20px -20px; padding: 14px 20px calc(18px + env(safe-area-inset-bottom)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -835,4 +856,91 @@ nav a:hover { background: #121821; }
   .project-tabs button { padding: 0 12px; white-space: nowrap; }
   .project-brief-view { grid-template-columns: 1fr; }
   .project-brief-view > div:last-child { grid-column: 1; }
+}
+
+/* Project dialog must stay above the workspace and use an opaque sheet. */
+.workspace-modal {
+  z-index: 100;
+  padding: 28px;
+  background: rgba(2, 4, 8, .84);
+  backdrop-filter: blur(18px) saturate(110%);
+}
+.project-form {
+  width: min(860px, 100%);
+  max-height: min(900px, calc(100dvh - 56px));
+  padding: 0 28px 28px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  border-color: rgba(255,255,255,.14);
+  border-radius: 26px;
+  background: #0e131a;
+  box-shadow: 0 34px 100px rgba(0,0,0,.68), 0 1px 0 rgba(255,255,255,.06) inset;
+}
+.project-form-head {
+  position: sticky;
+  z-index: 3;
+  top: 0;
+  margin: 0 -28px 22px;
+  padding: 26px 28px 18px;
+  background: linear-gradient(180deg, #0e131a 82%, rgba(14,19,26,.92));
+}
+.project-form-head h2 { font-size: 30px; letter-spacing: -.035em; }
+.project-form-head button {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-bright);
+  border-radius: 13px;
+  background: rgba(255,255,255,.035);
+}
+.project-form label { gap: 8px; color: var(--text-2); font-size: 12px; }
+.project-form input,
+.project-form textarea {
+  border-color: rgba(255,255,255,.12);
+  border-radius: 12px;
+  color: var(--text);
+  background: #080c12;
+}
+.project-form input:focus,
+.project-form textarea:focus {
+  outline: 0;
+  border-color: rgba(255,114,72,.8);
+  box-shadow: 0 0 0 4px rgba(255,114,72,.11);
+}
+.project-form textarea { min-height: 104px; }
+.project-form-actions {
+  position: sticky;
+  z-index: 3;
+  bottom: -28px;
+  margin: 24px -28px -28px;
+  padding: 16px 28px 24px;
+  background: linear-gradient(0deg, #0e131a 82%, rgba(14,19,26,.92));
+}
+.project-form-note {
+  padding: 14px 16px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 13px;
+  background: rgba(255,255,255,.025);
+  line-height: 1.5;
+}
+
+@media (max-width: 720px) {
+  .workspace-modal { padding: 0; place-items: end center; }
+  .project-form {
+    width: 100%;
+    height: 94dvh;
+    max-height: 94dvh;
+    padding: 0 20px 20px;
+    border-radius: 24px 24px 0 0;
+  }
+  .project-form-head { margin: 0 -20px 20px; padding: 22px 20px 14px; }
+  .project-form-grid { grid-template-columns: 1fr; }
+  .project-form-actions {
+    bottom: -20px;
+    margin: 22px -20px -20px;
+    padding: 14px 20px calc(18px + env(safe-area-inset-bottom));
+  }
 }
