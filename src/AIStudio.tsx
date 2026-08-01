@@ -69,6 +69,8 @@ export function AIStudio({ onAddDrafts }: { onAddDrafts: (drafts: GeneratedDraft
                 ? 'Серверный ключ OpenAI недействителен. Создайте новый ключ для текущего проекта.'
                 : failure?.upstreamCode && failure.upstreamCode !== 'unknown'
                   ? `OpenAI отклонил запрос: ${failure.upstreamCode}. Черновики не изменены.`
+                  : failure?.error
+                    ? `Генерация остановлена: ${failure.error}. Черновики не изменены.`
           : 'Генерация не завершена. Черновики и очередь публикаций не изменены.')
       setState('error')
       return
