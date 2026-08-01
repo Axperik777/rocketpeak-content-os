@@ -1,5 +1,15 @@
 # RocketPeak Content OS
 
+**Рабочая папка:** `C:\Users\Mylaptop\Desktop\MARKETING\Приложение`
+
+**GitHub:** `https://github.com/Axperik777/rocketpeak-content-os`
+
+**Основная ветка:** `main`
+
+**Публичная сборка:** GitHub Pages
+
+**Backend:** Supabase.
+
 Публичная демо-версия: `https://axperik777.github.io/rocketpeak-content-os/`
 
 Демо работает без Meta API. После входа материалы синхронизируются с приватной базой Supabase; локальное хранилище используется для миграции и резервного состояния интерфейса.
@@ -56,5 +66,6 @@
 - `ROADMAP.md` — приоритеты развития;
 - `STATUS.md` — актуальное состояние проекта;
 - `AGENTS.md` — правила работы с кодовой базой.
+- `audit/README.md` — назначение артефактов Lighthouse и TikTok App Review.
 
 Все кодовые файлы, зависимости, документация, логи и ресурсы приложения находятся только в этой папке. На рабочем столе остаётся только ярлык.

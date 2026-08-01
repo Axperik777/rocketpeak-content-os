@@ -6,13 +6,6 @@ dist/
 !.env.example
 *.log
 runtime/
-audit/*.json
-docs/
-AGENTS.md
-STATUS.md
-ROADMAP.md
-ACCOUNT_INVENTORY.md
-META_SETUP.md
 *.tsbuildinfo
 vite.config.js
 vite.config.d.ts
