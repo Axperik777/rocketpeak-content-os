@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import {
   Bot,
+  BrainCircuit,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -32,8 +33,9 @@ import { AuthScreen } from './AuthScreen'
 import { loadPublicationJobs, loadRemotePosts, prepareUser, saveRemotePosts, type PublicationJob } from './remote-store'
 import { deleteMediaAsset, loadMediaAssets, revalidateMediaAsset, uploadMediaAsset, type MediaAsset } from './media-store'
 import { supabase } from './supabase'
+import { AIStudio, type GeneratedDraft } from './AIStudio'
 
-type View = 'queue' | 'calendar' | 'accounts' | 'settings'
+type View = 'queue' | 'studio' | 'calendar' | 'accounts' | 'settings'
 type Filter = 'all' | 'review' | 'draft' | 'ready' | 'skipped'
 type TikTokCreatorInfo = {
   nickname: string
@@ -67,13 +69,14 @@ const accounts: Account[] = [
 
 const viewMeta: Record<View, { label: string; title: string; description: string; icon: LucideIcon }> = {
   queue: { label: 'Очередь', title: 'Рабочая очередь', description: 'Проверьте материал и примите одно решение.', icon: LayoutList },
+  studio: { label: 'AI-студия', title: 'Контент-лаборатория', description: 'Три готовых материала из одного точного брифа.', icon: BrainCircuit },
   calendar: { label: 'Календарь', title: 'План публикаций', description: 'Неделя без конфликтов и случайных выходов.', icon: CalendarDays },
   accounts: { label: 'Аккаунты', title: 'Карта Meta-активов', description: 'Кто есть кто и что разрешено подключать.', icon: UsersRound },
   settings: { label: 'Подключения', title: 'Безопасные подключения', description: 'Только официальные API и ручное подтверждение.', icon: PlugZap },
 }
 
 const statusLabels: Record<Status, string> = { draft: 'Черновик', review: 'Нужно решение', approved: 'Согласовано', skipped: 'Пропущено' }
-const validViews: View[] = ['queue', 'calendar', 'accounts', 'settings']
+const validViews: View[] = ['queue', 'studio', 'calendar', 'accounts', 'settings']
 const initialPlan = loadPlan()
 const privacyLabels: Record<Post['tiktokPrivacy'], string> = {
   '': 'Выберите видимость',
@@ -410,6 +413,35 @@ function App() {
     setEditingPost(draft)
   }
 
+  const addGeneratedDrafts = async (generated: GeneratedDraft[]) => {
+    const occupied = new Map<string, number>()
+    posts.filter((post) => post.status !== 'skipped').forEach((post) => occupied.set(post.scheduledDate, (occupied.get(post.scheduledDate) ?? 0) + 1))
+    const cursor = new Date()
+    let scheduledDate = ''
+    for (let offset = 0; offset < 31; offset += 1) {
+      const candidate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tbilisi', year: 'numeric', month: '2-digit', day: '2-digit' }).format(cursor)
+      if ((occupied.get(candidate) ?? 0) === 0) { scheduledDate = candidate; break }
+      cursor.setDate(cursor.getDate() + 1)
+    }
+    if (!scheduledDate) throw new Error('no_schedule_slot')
+    const slots = ['10:00', '14:30', '19:00']
+    const now = new Date().toISOString()
+    const created = generated.map((item, index): Post => ({
+      ...createDraftPost(), scheduledDate, scheduledTime: slots[index] ?? '19:00',
+      pillar: item.pillar, title: item.title, hook: item.hook, format: item.format,
+      channels: ['Facebook', 'Instagram', 'TikTok'], facebookCaption: item.facebookCaption,
+      instagramCaption: item.instagramCaption, tiktokCaption: item.tiktokCaption, cta: item.cta,
+      createdAt: now, updatedAt: now,
+    }))
+    const updated = [...created, ...posts]
+    if (session) await saveRemotePosts(session.user.id, updated)
+    setPosts(updated)
+    setSelectedPostId(created[0]?.id ?? null)
+    setFilter('draft')
+    openView('queue')
+    showNotice(`${created.length} материала добавлены как черновики. Публикация не запущена.`)
+  }
+
   const openEditor = (post: Post) => {
     const copy = { ...post, channels: [...post.channels] }
     editingOriginal.current = copy
@@ -636,7 +668,7 @@ function App() {
                 {visiblePosts.length === 0 && <div className="empty-state"><CheckCircle2 /><h3>Здесь всё разобрано</h3><p>Выберите другой фильтр или создайте новый материал.</p></div>}
                 {visiblePosts.map((post) => { const postDate = formatPostDate(post); const job = latestJobByPost.get(post.id); return <article className={`post-row post-row--${post.status} ${selectedPost?.id === post.id ? 'post-row--selected' : ''}`} key={post.id}>
                   <div className="date-block"><strong>{postDate.day}</strong><span>{postDate.month}</span><small>{post.scheduledTime}</small></div>
-                  <div className="post-body"><div className="post-meta"><span>{post.pillar}</span><i>{post.format}</i><em className={`status status--${job?.state ?? post.status}`}>{job ? (job.state === 'pending' ? 'В очереди' : job.state === 'processing' ? 'Отправляется' : job.state === 'published' ? 'Опубликовано' : job.state === 'failed' ? 'Ошибка публикации' : 'Отменено') : statusLabels[post.status]}</em></div><h3>{post.title}</h3><p>{post.hook}</p>{job?.state === 'failed' && <small className="publication-error">{job.lastErrorCode ?? 'Неизвестная ошибка'}</small>}<div className="route"><b>{accountName(post.accountId)}</b>{post.channels.map((channel) => <ChannelIcon channel={channel} key={channel} />)}<small>v{post.version}</small></div></div>
+                  <div className="post-body"><div className="post-meta"><span>{post.pillar}</span><i>{post.format}</i><em className={`status status--${job?.state ?? post.status}`}>{job ? (job.state === 'pending' ? 'В очереди' : job.state === 'processing' ? 'Обрабатывается площадкой' : job.state === 'published' ? 'Опубликовано' : job.state === 'failed' ? 'Ошибка публикации' : 'Отменено') : statusLabels[post.status]}</em></div><h3>{post.title}</h3><p>{post.hook}</p>{job?.state === 'failed' && <small className="publication-error">{job.lastErrorCode ?? 'Неизвестная ошибка'}</small>}<div className="route"><b>{accountName(post.accountId)}</b>{post.channels.map((channel) => <ChannelIcon channel={channel} key={channel} />)}<small>v{post.version}</small></div></div>
                   <div className="row-actions"><button onClick={() => { setSelectedPostId(post.id); setCaptionExpanded(false) }}><Eye />Превью</button>{post.status === 'review' ? <><button className="approve" onClick={() => changeStatus(post.id, 'approved')}><Check />Согласовать</button><button onClick={() => openEditor(post)}><Pencil />Исправить</button><button onClick={() => changeStatus(post.id, 'skipped')}><SkipForward />Пропустить</button></> : post.status === 'skipped' ? <button onClick={() => changeStatus(post.id, 'draft')}><FileText />Вернуть</button> : <><button onClick={() => openEditor(post)}><Pencil />Редактировать</button>{post.status === 'draft' && <button onClick={() => deletePost(post)}><Trash2 />Удалить</button>}<button onClick={() => changeStatus(post.id, 'review')}><FileText />На проверку</button></>}</div>
                 </article> })}
               </div>
@@ -649,6 +681,8 @@ function App() {
             </> : <div className="empty-state"><Eye /><h3>Выберите материал</h3><p>Превью будет связано с выбранной версией.</p></div>}</aside>
           </section>
         </>}
+
+        {view === 'studio' && <AIStudio onAddDrafts={addGeneratedDrafts} />}
 
         {view === 'calendar' && <section className="calendar-view panel"><div className="section-head"><div><span className="eyebrow">БЛИЖАЙШИЕ ДАТЫ</span><h2>Календарный план</h2></div><div className="legend"><span><i className="dot draft" />Черновик</span><span><i className="dot review" />Нужно решение</span><span><i className="dot approved" />Готово</span></div></div><div className="calendar-grid">{[...posts].sort((a,b) => `${a.scheduledDate}T${a.scheduledTime}`.localeCompare(`${b.scheduledDate}T${b.scheduledTime}`)).map((post) => <article key={post.id}><div className="calendar-day"><span>{new Intl.DateTimeFormat('ru-RU',{weekday:'short',timeZone:post.timezone}).format(new Date(`${post.scheduledDate}T12:00:00`)).toUpperCase()}</span><strong>{formatPostDate(post).full}</strong></div><div className={`calendar-post ${post.status}`}><small>{post.scheduledTime} · {post.format}</small><h3>{post.title}</h3><p>{accountName(post.accountId)}</p><div>{post.channels.map((channel) => <ChannelIcon channel={channel} key={channel} />)}</div></div></article>)}</div></section>}
 

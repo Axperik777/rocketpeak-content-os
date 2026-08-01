@@ -20,6 +20,12 @@ describe('publication queue', () => {
     expect(finishJob(claimed, { ok: true, remotePostId: 'mock_post_1' }, now)).toMatchObject({ state: 'published', remotePostId: 'mock_post_1' })
   })
 
+  it('keeps asynchronous provider uploads in processing until confirmed', () => {
+    const now = '2026-08-01T10:00:00.000Z'
+    const [claimed] = claimDueJobs([createPublicationJob('job-async', 'post-async', 1, 'TikTok', now)], now)
+    expect(finishJob(claimed, { ok: true, remotePostId: 'publish-123', final: false }, now)).toMatchObject({ state: 'processing', remotePostId: 'publish-123' })
+  })
+
   it('retries a temporary error and then succeeds', () => {
     const [claimed] = claimDueJobs([createPublicationJob('1', 'post-1', 1, 'Facebook', now)], now)
     const retry = finishJob(claimed, { ok: false, code: 'rate_limited', retryable: true }, now)

@@ -11,7 +11,7 @@ export type PublicationJob = {
 }
 
 export type ProviderResult =
-  | { ok: true; remotePostId: string }
+  | { ok: true; remotePostId: string; final?: boolean }
   | { ok: false; code: string; retryable: boolean }
 
 export function createPublicationJob(id: string, postId: string, version: number, channel: string, runAfter: string): PublicationJob {
@@ -32,6 +32,7 @@ export function claimDueJobs(jobs: PublicationJob[], now: string, limit = 10) {
 }
 
 export function finishJob(job: PublicationJob, result: ProviderResult, now: string, maxAttempts = 4): PublicationJob {
+  if (result.ok && result.final === false) return { ...job, state: 'processing', remotePostId: result.remotePostId, lastErrorCode: null }
   if (result.ok) return { ...job, state: 'published', remotePostId: result.remotePostId, lastErrorCode: null }
   if (result.retryable && job.attemptCount < maxAttempts) {
     const delayMinutes = 2 ** job.attemptCount
