@@ -462,6 +462,9 @@ body {
 .live-dot { background: #5bd38b; box-shadow: 0 0 0 4px rgba(91,211,139,.1); }
 main { padding: 28px clamp(26px, 3.4vw, 58px) 48px; }
 .topbar { align-items: center; margin-bottom: 20px; }
+.topbar--home { min-height: 44px; margin-bottom: 4px; }
+.home-topline { display: flex; align-items: center; gap: 9px; color: var(--text-3); font: 650 10px/1 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.home-topline i { width: 3px; height: 3px; border-radius: 50%; background: #495567; }
 .eyebrow { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 .page-title h1 { margin-top: 8px; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable", sans-serif; font-weight: 680; letter-spacing: -.045em; }
 .page-title p { color: var(--text-3); font-size: 13px; }

@@ -660,8 +660,9 @@ function App() {
       </aside>
 
       <main id="workspace">
-        <header className={`topbar ${view === 'project' ? 'topbar--project' : ''}`}>
-          {view !== 'project' && <div className="page-title"><span className="eyebrow">ROCKETPEAK · {todayLabel.toUpperCase()} · ТБИЛИСИ</span><h1>{activeMeta.title}</h1><p>{activeMeta.description}</p></div>}
+        <header className={`topbar ${view === 'project' ? 'topbar--project' : ''} ${view === 'home' ? 'topbar--home' : ''}`}>
+          {view === 'home' && <div className="home-topline"><span>ROCKETPEAK</span><i />{todayLabel}<i />ТБИЛИСИ</div>}
+          {view !== 'project' && view !== 'home' && <div className="page-title"><span className="eyebrow">ROCKETPEAK · {todayLabel.toUpperCase()} · ТБИЛИСИ</span><h1>{activeMeta.title}</h1><p>{activeMeta.description}</p></div>}
           <div className="top-actions"><input ref={importInput} className="visually-hidden" type="file" accept="application/json,.json" onChange={importPlan} />{['queue','studio','calendar','accounts','settings'].includes(view) && <><button className="button secondary" onClick={() => importInput.current?.click()}><Upload />Импорт</button><button className="button secondary" onClick={exportPlan}><Download />Экспорт</button></>}<button className="button secondary" onClick={() => supabase?.auth.signOut()}>Выйти</button>{['queue','studio','calendar','accounts','settings'].includes(view) && <button className="button primary" onClick={createDraft}><Plus />Новый материал</button>}</div>
         </header>
 
