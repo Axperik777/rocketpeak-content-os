@@ -52,8 +52,9 @@ export function AIStudio({ onAddDrafts }: { onAddDrafts: (drafts: GeneratedDraft
     setError('')
     const { data, error: invokeError } = await supabase.functions.invoke('generate-content', { body: { brief, count: 3 } })
     let failure = data
-    if (invokeError && !failure && 'context' in invokeError && invokeError.context instanceof Response) {
-      failure = await invokeError.context.json().catch(() => null)
+    if (invokeError && !failure && 'context' in invokeError) {
+      const context = invokeError.context as { json?: () => Promise<unknown> }
+      if (typeof context?.json === 'function') failure = await context.json().catch(() => null)
     }
     if (invokeError || !Array.isArray(data?.drafts) || data.drafts.length !== 3) {
       setError(failure?.error === 'openai_not_configured'
