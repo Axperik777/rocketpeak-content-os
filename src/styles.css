@@ -474,7 +474,7 @@ main { padding: 28px clamp(26px, 3.4vw, 58px) 48px; }
 .home-welcome { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 36px; align-items: end; padding: 18px 2px 36px; }
 .home-kicker { display: inline-flex; align-items: center; gap: 8px; color: var(--text-3); font-size: 12px; font-weight: 650; }
 .home-kicker > span { width: 7px; height: 7px; border-radius: 50%; background: #5bd38b; box-shadow: 0 0 0 4px rgba(91,211,139,.1); }
-.home-welcome h2 { max-width: 760px; margin: 14px 0 14px; font: 690 clamp(42px, 5.2vw, 68px)/.98 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable", sans-serif; letter-spacing: -.06em; }
+.home-welcome h2 { max-width: 760px; margin: 14px 0 14px; font: 690 clamp(40px, 4.5vw, 58px)/1 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable", sans-serif; letter-spacing: -.055em; }
 .home-welcome > div > p { max-width: 610px; margin: 0; color: var(--text-2); font-size: 17px; line-height: 1.55; }
 .home-primary-action { min-height: 76px; padding: 0 18px; display: grid; grid-template-columns: 38px 1fr 20px; gap: 12px; align-items: center; border: 1px solid rgba(255,255,255,.12); border-radius: 20px; color: var(--text); background: linear-gradient(145deg, rgba(255,255,255,.1), rgba(255,255,255,.045)); box-shadow: 0 14px 40px rgba(0,0,0,.2); text-align: left; cursor: pointer; transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease; }
 .home-primary-action:hover { border-color: rgba(255,114,72,.45); background: rgba(255,255,255,.11); transform: translateY(-2px); }
@@ -483,7 +483,7 @@ main { padding: 28px clamp(26px, 3.4vw, 58px) 48px; }
 .home-primary-action small { margin-bottom: 5px; color: var(--text-3); font-size: 10px; font-weight: 650; }
 .home-primary-action strong { font-size: 15px; }
 .home-workspaces { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.workspace-choice { min-height: 410px; padding: 26px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 26px; color: var(--text); background: linear-gradient(155deg, rgba(255,255,255,.055), rgba(255,255,255,.018)); box-shadow: 0 20px 60px rgba(0,0,0,.18), 0 1px 0 rgba(255,255,255,.035) inset; text-align: left; cursor: pointer; overflow: hidden; transition: border-color 200ms ease, transform 200ms ease, background-color 200ms ease; }
+.workspace-choice { min-width: 0; min-height: 410px; padding: 26px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 26px; color: var(--text); background: linear-gradient(155deg, rgba(255,255,255,.055), rgba(255,255,255,.018)); box-shadow: 0 20px 60px rgba(0,0,0,.18), 0 1px 0 rgba(255,255,255,.035) inset; text-align: left; cursor: pointer; overflow: hidden; transition: border-color 200ms ease, transform 200ms ease, background-color 200ms ease; }
 .workspace-choice:hover { transform: translateY(-3px); border-color: rgba(255,255,255,.19); background-color: rgba(255,255,255,.025); }
 .workspace-choice--rocket { background: radial-gradient(circle at 100% 0, rgba(255,114,72,.13), transparent 38%), linear-gradient(155deg, rgba(255,255,255,.055), rgba(255,255,255,.018)); }
 .choice-top { display: flex; align-items: center; justify-content: space-between; }
@@ -505,7 +505,7 @@ main { padding: 28px clamp(26px, 3.4vw, 58px) 48px; }
 .home-principle p { max-width: 720px; margin: 0; color: var(--text-2); font-size: 13px; line-height: 1.6; }
 .home-principle b { color: var(--text); font-weight: 650; }
 
-@media (max-width: 900px) {
+@media (max-width: 1180px) {
   .home-welcome { grid-template-columns: 1fr; }
   .home-primary-action { width: min(100%, 360px); }
   .home-workspaces { grid-template-columns: 1fr; }
