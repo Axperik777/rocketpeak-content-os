@@ -1,6 +1,14 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
+const corsHeaders = {
+  'Access-Control-Allow-Origin': 'https://axperik777.github.io',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+  status,
+  headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+})
 const text = (value: unknown, max: number) => typeof value === 'string' ? value.trim().slice(0, max) : ''
 const safetyIdentifier = async (userId: string) => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`rocketpeak:${userId}`))
@@ -26,6 +34,7 @@ const draftSchema = {
 }
 
 Deno.serve(async (request) => {
+  if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
   const openaiKey = Deno.env.get('OPENAI_API_KEY')
   if (!openaiKey) return json({ error: 'openai_not_configured' }, 503)
