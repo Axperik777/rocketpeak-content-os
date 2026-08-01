@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "build:github": "tsc -b && vite build --mode github",
     "preview": "vite preview --host 127.0.0.1",
+    "companion": "node scripts/local-companion.mjs",
     "test": "vitest run"
   },
   "dependencies": {
