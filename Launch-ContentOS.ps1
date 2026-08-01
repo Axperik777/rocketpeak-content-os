@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $appRoot = $PSScriptRoot
-$appUrl = 'https://axperik777.github.io/rocketpeak-content-os/#home'
+$appUrl = 'http://127.0.0.1:43121/#home'
 $runtimeDir = Join-Path $appRoot 'runtime'
 $logPath = Join-Path $runtimeDir 'launch.log'
 $companionLog = Join-Path $runtimeDir 'local-companion.log'

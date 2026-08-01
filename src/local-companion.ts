@@ -1,6 +1,8 @@
 import type { ClientProject } from './project-store'
 
-const endpoint = 'http://127.0.0.1:43121'
+const endpoint = ['127.0.0.1', 'localhost'].includes(window.location.hostname)
+  ? `${window.location.origin}/api`
+  : 'http://127.0.0.1:43121'
 
 export type LocalCompanionStatus = { online: boolean; root?: string; host?: string }
 

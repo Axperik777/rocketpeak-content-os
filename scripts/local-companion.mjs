@@ -5,6 +5,9 @@ import os from 'node:os'
 import { fileURLToPath } from 'node:url'
 
 export const PORT = 43121
+const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const DIST_ROOT = path.join(APP_ROOT, 'dist')
+const PUBLISHED_APP = 'https://axperik777.github.io/rocketpeak-content-os'
 export const PROJECTS_ROOT = process.env.ROCKETPEAK_PROJECTS_ROOT || 'C:\\Users\\Mylaptop\\Desktop\\MARKETING\\Проекты'
 export const PROJECT_FOLDERS = [
   ['00 Бриф'],
@@ -21,6 +24,8 @@ export const PROJECT_FOLDERS = [
 
 const allowedOrigins = new Set([
   'https://axperik777.github.io',
+  'http://127.0.0.1:43121',
+  'http://localhost:43121',
   'http://127.0.0.1:4173',
   'http://localhost:4173',
   'http://127.0.0.1:5173',
@@ -70,6 +75,55 @@ function send(res, status, body, origin) {
   res.end(JSON.stringify(body))
 }
 
+const contentTypes = {
+  '.css': 'text/css; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.ico': 'image/x-icon',
+  '.jpeg': 'image/jpeg',
+  '.jpg': 'image/jpeg',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml; charset=utf-8',
+  '.webp': 'image/webp',
+}
+
+async function sendStatic(req, res) {
+  const requestPath = decodeURIComponent(new URL(req.url ?? '/', `http://127.0.0.1:${PORT}`).pathname)
+  try {
+    const publishedUrl = requestPath.startsWith('/rocketpeak-content-os/')
+      ? `https://axperik777.github.io${requestPath}`
+      : `${PUBLISHED_APP}${requestPath}`
+    const published = await fetch(publishedUrl, { redirect: 'follow' })
+    if (published.ok) {
+      const contents = Buffer.from(await published.arrayBuffer())
+      res.setHeader('Content-Type', published.headers.get('content-type') ?? contentTypes[path.extname(requestPath).toLowerCase()] ?? 'application/octet-stream')
+      res.setHeader('Cache-Control', requestPath === '/' ? 'no-store' : 'public, max-age=300')
+      res.writeHead(200); res.end(contents); return
+    }
+  } catch {
+    // Fall back to the last local build when the published app is unreachable.
+  }
+  const relativePath = requestPath === '/' ? 'index.html' : requestPath.replace(/^\/+/, '')
+  let target = path.resolve(DIST_ROOT, relativePath)
+  if (!(target === DIST_ROOT || target.startsWith(`${DIST_ROOT}${path.sep}`))) {
+    res.writeHead(403); res.end('Forbidden'); return
+  }
+  try {
+    const stats = await fs.stat(target)
+    if (stats.isDirectory()) target = path.join(target, 'index.html')
+    const contents = await fs.readFile(target)
+    res.setHeader('Content-Type', contentTypes[path.extname(target).toLowerCase()] ?? 'application/octet-stream')
+    res.setHeader('Cache-Control', target.endsWith('index.html') ? 'no-store' : 'public, max-age=31536000, immutable')
+    res.writeHead(200); res.end(contents)
+  } catch {
+    const index = await fs.readFile(path.join(DIST_ROOT, 'index.html'))
+    res.setHeader('Content-Type', 'text/html; charset=utf-8')
+    res.setHeader('Cache-Control', 'no-store')
+    res.writeHead(200); res.end(index)
+  }
+}
+
 async function readJson(req) {
   let raw = ''
   for await (const chunk of req) {
@@ -93,11 +147,12 @@ export function createCompanionServer() {
     }
     if (origin && !allowedOrigins.has(origin)) return send(res, 403, { error: 'origin_not_allowed' })
     try {
-      if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true, root: PROJECTS_ROOT, host: os.hostname() }, origin)
-      if (req.method === 'POST' && req.url === '/projects') {
+      if (req.method === 'GET' && (req.url === '/health' || req.url === '/api/health')) return send(res, 200, { ok: true, root: PROJECTS_ROOT, host: os.hostname() }, origin)
+      if (req.method === 'POST' && (req.url === '/projects' || req.url === '/api/projects')) {
         const projectPath = await ensureProjectStructure(await readJson(req))
         return send(res, 200, { ok: true, path: projectPath }, origin)
       }
+      if (req.method === 'GET') return sendStatic(req, res)
       return send(res, 404, { error: 'not_found' }, origin)
     } catch (error) {
       return send(res, 400, { error: error instanceof Error ? error.message : 'unknown_error' }, origin)
