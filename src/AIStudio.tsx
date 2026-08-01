@@ -61,7 +61,7 @@ export function AIStudio({ onAddDrafts }: { onAddDrafts: (drafts: GeneratedDraft
         ? 'AI подготовлен, но серверный ключ OpenAI ещё не добавлен.'
         : failure?.error === 'daily_limit_reached'
           ? 'Дневной лимит генераций исчерпан. Это защищает бюджет и аккаунт от всплесков.'
-          : failure?.upstreamCode === 'insufficient_quota'
+          : failure?.upstreamCode === 'insufficient_quota' || failure?.upstreamCode === 'credit_balance_exhausted'
             ? 'На API OpenAI не подключён баланс. Добавьте способ оплаты и лимит расходов в Platform OpenAI.'
             : failure?.upstreamCode === 'model_not_found'
               ? 'Выбранная модель OpenAI недоступна этому проекту. Нужно сменить модель или доступ проекта.'
