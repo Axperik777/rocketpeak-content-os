@@ -34,7 +34,7 @@ function Choice<K extends keyof Brief>({ name, value, options, onChange }: { nam
   return <div className="brief-options" role="radiogroup">{Object.entries(options).map(([id, label]) => <button type="button" role="radio" aria-checked={value === id} className={value === id ? 'selected' : ''} onClick={() => onChange(id as Brief[K])} key={id}>{value === id && <Check />}{label}</button>)}</div>
 }
 
-export function CreativeLab({ initialProjectId }: { initialProjectId?: string }) {
+export function CreativeLab({ initialProjectId, lockedProject = false }: { initialProjectId?: string; lockedProject?: boolean }) {
   const [projects, setProjects] = useState<ClientProject[]>([])
   const [projectId, setProjectId] = useState(initialProjectId ?? '')
   const [loading, setLoading] = useState(true)
@@ -53,7 +53,7 @@ export function CreativeLab({ initialProjectId }: { initialProjectId?: string })
       <div className="brief-main">
         <div className="brief-lead"><span className="eyebrow">УПРАВЛЯЕМЫЙ БРИФ</span><h2>Соберите сильную гипотезу</h2><p>Вы выбираете стратегию. Система превращает ответы в точное задание для текста и визуала.</p></div>
 
-        <section className="brief-section"><div className="brief-number">01</div><div><h3>Контекст проекта</h3><p>Постоянные данные клиента подставляются во все варианты.</p><label className="brief-select"><span>Проект</span><select value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">Выберите проект</option>{projects.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>{project && <div className="brief-context"><strong>{project.name}</strong><span>{[project.product, project.geography, project.audience].filter(Boolean).join(' · ') || 'Контекст проекта нужно дополнить'}</span></div>}</div></section>
+        <section className="brief-section"><div className="brief-number">01</div><div><h3>Контекст проекта</h3><p>Постоянные данные клиента подставляются во все варианты.</p><label className="brief-select"><span>Проект</span><select value={projectId} onChange={(event) => setProjectId(event.target.value)} disabled={lockedProject}><option value="">Выберите проект</option>{projects.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>{project && <div className="brief-context"><strong>{project.name}</strong><span>{[project.product, project.geography, project.audience].filter(Boolean).join(' · ') || 'Контекст проекта нужно дополнить'}</span></div>}</div></section>
 
         <section className="brief-section"><div className="brief-number">02</div><div><h3>Какой бизнес-результат нужен?</h3><p>От цели зависит CTA, сила оффера и способ закрытия возражений.</p><Choice name="goal" value={brief.goal} options={copy.goal} onChange={(value) => set('goal', value)} /></div></section>
 
